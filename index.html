@@ -701,11 +701,13 @@
   }
 
   /* ===== School 캘린더 과목 색상 범례 ===== */
+  // 캘린더 표기용 과목명: '중간'(중간고사) 표기 제거
+  function calSubjName(name){ return String(name||"").replace(/\s*중간(고사)?\s*/g," ").replace(/\s+/g," ").trim(); }
   function renderSchoolLegend(){
     var host=$("calLegend-school"); if(!host) return;
     var subs=subjects(), ids=Object.keys(subs);
     var base='<span><i class="exb"></i>시험</span><span><i class="sq" style="background:var(--soon)"></i>과제 마감</span>';
-    var subj=ids.map(function(id){ var s=subs[id]; return '<span><i class="sq" style="background:'+subjColor(s)+'"></i>'+esc(s.name)+'</span>'; }).join("");
+    var subj=ids.map(function(id){ var s=subs[id]; return '<span><i class="sq" style="background:'+subjColor(s)+'"></i>'+esc(calSubjName(s.name))+'</span>'; }).join("");
     host.innerHTML=base+(subj?'<span class="cal-legend-sep">공부 ▸</span>'+subj:'<span><i style="background:var(--accent)"></i>공부</span>');
   }
 
