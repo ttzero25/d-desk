@@ -180,6 +180,8 @@
   .asn .actbtns{display:flex;gap:2px;} .asn .actbtns button{border:none;background:none;color:var(--muted);padding:4px;display:inline-flex;opacity:0;transition:.12s;}
   .asn:hover .actbtns button{opacity:1;} .asn .actbtns .edit:hover{color:var(--accent);} .asn .actbtns .del:hover{color:var(--urgent);}
   .asn .actbtns svg{width:14px;height:14px;}
+  .asn .note{font-size:12px;color:var(--ink-2);margin-top:4px;white-space:pre-wrap;line-height:1.45;}
+  .dm-note{font-size:12px;color:var(--ink-2);margin-top:5px;white-space:pre-wrap;line-height:1.45;}
 
   .mat-group{padding:11px 0;border-top:1px solid var(--line);} .mat-group:first-child{border-top:none;}
   .mat-group .g-name{font-size:13.5px;font-weight:600;display:flex;align-items:center;gap:7px;margin-bottom:8px;}
@@ -293,7 +295,7 @@
           </div>
         </div>
         <div class="cal-grid" id="calGrid-home"></div>
-        <div class="cal-legend"><span><i class="exb"></i>시험</span><span><i class="sq" style="background:var(--soon)"></i>과제 마감</span></div>
+        <div class="cal-legend"><span><i class="sq" style="background:#4f46e5"></i>학교</span><span><i class="sq" style="background:#0891b2"></i>연구실</span><span><i class="sq" style="background:#db2777"></i>동아리</span><span><i class="sq" style="background:#79828f"></i>기타</span></div>
       </section>
       <div class="col">
         <div id="nextExam"></div>
@@ -443,7 +445,7 @@
         d2:{id:"d2",name:"미시경제학",exam:p(9),workload:2,scope:"수요공급,소비자이론,생산자이론,시장구조",colorIdx:1,materials:[{label:"교재 요약",url:"#"}],done:{}}
       },
       tasks:{
-        a1:{id:"a1",title:"자료구조 과제 3 — 트리 구현",cat:"school",subjectId:"d1",due:p(1),done:false},
+        a1:{id:"a1",title:"자료구조 과제 3 — 트리 구현",cat:"school",subjectId:"d1",due:p(1),note:"AVL 회전 포함, 손코딩 X · 제출은 LMS",done:false},
         a2:{id:"a2",title:"경제학 리포트 제출",cat:"school",subjectId:"d2",due:p(4),done:false},
         a3:{id:"a3",title:"논문 세미나 발표 준비",cat:"commsec",subjectId:"",due:p(2),done:false},
         a4:{id:"a4",title:"랩미팅 자료 정리",cat:"commsec",subjectId:"",due:p(6),done:false},
@@ -526,6 +528,7 @@
   var X='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>';
   var PEN='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>';
   var scopeStr=function(u){ return u&&u.length?u.join(", "):""; };
+  var EXAMCHIP='<span class="cat-chip" style="background:var(--urgent-soft);color:var(--urgent)"><span class="cdot" style="background:var(--urgent)"></span>시험</span>';
 
   /* ===== 상태 ===== */
   var cal={y:0,m:0}, selKey=null, activeTab="home", dayModalKey=null;
@@ -600,15 +603,16 @@
       var s=daySlot(k,tKey), hasExam=false, dotsArr=[], bars="";
       for(var l=0;l<laneCount;l++){
         var bt=null; for(var ri=0;ri<rTasks.length;ri++){ if(laneOf[rTasks[ri].id]===l && taskCoversDay(rTasks[ri],k)){ bt=rTasks[ri]; break; } }
-        if(bt){ var br=taskRange(bt), bc=CAT[bt.cat]||CAT.etc, isS=(k===br.start), isE=(k===br.end);
+        if(bt){ var br=taskRange(bt), bcol=(bt.type==="exam")?"var(--urgent)":(CAT[bt.cat]||CAT.etc).color, isS=(k===br.start), isE=(k===br.end);
+          if(bt.type==="exam") hasExam=true;
           var rad=(isS?"border-top-left-radius:4px;border-bottom-left-radius:4px;":"")+(isE?"border-top-right-radius:4px;border-bottom-right-radius:4px;":"");
           var contR=(!isE && dow!==6);   // 같은 주에서 다음 날로 이어지면 간격 넘어 연결
-          bars+='<span class="cal-bar'+(bt.done?" done":"")+'" style="background:'+bc.color+';'+rad+(contR?"margin-right:-5px;position:relative;z-index:1;":"")+'"></span>';
+          bars+='<span class="cal-bar'+(bt.done?" done":"")+'" style="background:'+bcol+';'+rad+(contR?"margin-right:-5px;position:relative;z-index:1;":"")+'"></span>';
         } else bars+='<span class="cal-bar spacer"></span>';
       }
       if(showExam) s.exams.forEach(function(){ hasExam=true; dotsArr.push('<i style="background:var(--urgent)"></i>'); });
       if(showStudy) s.study.forEach(function(o){ dotsArr.push('<i style="background:'+subjColor(o.s)+'"></i>'); });
-      s.dues.forEach(function(t){ if(!inFilter(t))return; var r=taskRange(t); if(r&&r.isRange&&laneOf[t.id]!==undefined&&laneOf[t.id]<MAXLANE) return; var col=(filter===null)?(CAT[t.cat]||CAT.etc).color:"var(--soon)"; dotsArr.push('<i class="due" style="background:'+col+'"></i>'); });
+      s.dues.forEach(function(t){ if(!inFilter(t))return; var r=taskRange(t); if(r&&r.isRange&&laneOf[t.id]!==undefined&&laneOf[t.id]<MAXLANE){ if(t.type==="exam") hasExam=true; return; } if(t.type==="exam") hasExam=true; var col=(t.type==="exam")?"var(--urgent)":((filter===null)?(CAT[t.cat]||CAT.etc).color:"var(--soon)"); dotsArr.push('<i class="due" style="background:'+col+'"></i>'); });
       var hol=holidayName(k);
       var cls="cal-cell"+(other?" other":"")+(k===tKey?" today":(dow===0?" sun":dow===6?" sat":""))+(k===selKey?" sel":"")+(hasExam?" hasexam":"")+(hol?" holiday":"");
       html+='<button class="'+cls+'" data-action="cal-day" data-key="'+k+'"><span class="cn">'+cd.getDate()+'</span>'+(hol?'<span class="cal-hol">'+esc(hol)+'</span>':'')+(bars?'<span class="cal-bars">'+bars+'</span>':'')+'<span class="cal-dots">'+dotsArr.slice(0,4).join("")+'</span></button>';
@@ -639,7 +643,7 @@
   function allUrgentItems(tKey){
     var arr=[];
     Object.keys(subjects()).forEach(function(id){ var s=subjects()[id]; if(diffDays(tKey,s.exam)>=0) arr.push({kind:"exam",title:s.name,start:s.exam,end:s.exam,isRange:false,date:s.exam,cat:"school",color:subjColor(s),done:false}); });
-    Object.keys(tasks()).forEach(function(id){ var t=tasks()[id]; var r=taskRange(t); if(r) arr.push({kind:"task",id:id,title:t.title,start:r.start,end:r.end,isRange:r.isRange,date:r.start,cat:t.cat||"etc",done:!!t.done}); });
+    Object.keys(tasks()).forEach(function(id){ var t=tasks()[id]; var r=taskRange(t); if(r) arr.push({kind:"task",id:id,title:t.title,start:r.start,end:r.end,isRange:r.isRange,date:r.start,cat:t.cat||"etc",type:t.type||"",done:!!t.done}); });
     arr.sort(function(a,b){ if(a.done!==b.done) return a.done?1:-1; return a.date<b.date?-1:a.date>b.date?1:(a.kind==="exam"?-1:1); });
     return arr;
   }
@@ -650,7 +654,7 @@
     $("urgentList").innerHTML=arr.map(function(it){
       var st=shortStatus(it.start,it.end,it.done,tKey), c=CAT[it.cat]||CAT.etc;
       var chip='<span class="cat-chip" style="background:'+c.color+'22;color:'+c.color+'"><span class="cdot" style="background:'+c.color+'"></span>'+c.label+'</span>';
-      var kindTxt=it.kind==="exam"?'<span class="badge2 ex">시험</span>':'';
+      var kindTxt=(it.kind==="exam"||it.type==="exam")?EXAMCHIP:'';
       var dtxt=it.isRange?(fmtDate(it.start)+" ~ "+fmtDate(it.end)):(fmtDate(it.end)+" ("+WD[parseKey(it.end).getDay()]+")");
       return '<div class="urow '+(it.done?"done":"")+'"><span class="ud dday '+st.c+'">'+st.t+'</span><div class="ui"><div class="t">'+esc(it.title)+'</div><div class="m">'+chip+kindTxt+'<span class="dm" style="font-family:var(--mono)">'+dtxt+'</span></div></div></div>';
     }).join("");
@@ -726,7 +730,8 @@
       var dt=r.isRange?(fmtDate(r.start)+" ~ "+fmtDate(r.end)):fmtDate(r.end);
       var extra=(r.isRange&&!t.done&&tKey>=r.start&&tKey<=r.end)?(" · 마감 "+ddayLabel(diffDays(tKey,r.end))):"";
       dm='<span class="dm '+cls+'">'+dt+' · '+st.t+extra+'</span>'; }
-    return '<div class="asn '+(t.done?"done":"")+'"><button class="check" data-action="toggle-task" data-id="'+t.id+'" aria-label="완료 전환">'+CHECK+'</button><div class="info"><div class="t">'+esc(t.title)+'</div><div class="m">'+tag+dm+'</div></div><div class="actbtns"><button class="edit" data-action="edit-task" data-id="'+t.id+'" aria-label="편집">'+PEN+'</button><button class="del" data-action="del-task" data-id="'+t.id+'" aria-label="삭제">'+X+'</button></div></div>';
+    var examB=(t.type==="exam")?EXAMCHIP:'';
+    return '<div class="asn '+(t.done?"done":"")+'"><button class="check" data-action="toggle-task" data-id="'+t.id+'" aria-label="완료 전환">'+CHECK+'</button><div class="info"><div class="t">'+esc(t.title)+'</div><div class="m">'+examB+tag+dm+'</div>'+(t.note?'<div class="note">'+esc(t.note)+'</div>':'')+'</div><div class="actbtns"><button class="edit" data-action="edit-task" data-id="'+t.id+'" aria-label="편집">'+PEN+'</button><button class="del" data-action="del-task" data-id="'+t.id+'" aria-label="삭제">'+X+'</button></div></div>';
   }
   function renderSchoolTasks(tKey){
     var subs=subjects(), tk=tasks();
@@ -811,8 +816,8 @@
     var rows="";
     it.exams.forEach(function(x){ var n=diffDays(tKey,x.exam);
       rows+='<div class="dm-row" data-action="edit-subject" data-id="'+x.id+'"><span class="dot" style="background:'+subjColor(x)+'"></span><div class="dm-main"><div class="dm-t">'+esc(x.name)+' 시험</div><div class="dm-sub"><span class="badge2 ex">시험</span><span class="dm">'+fmtDate(x.exam)+' · '+ddayLabel(n)+'</span></div></div><div class="dm-acts"><button data-action="edit-subject" data-id="'+x.id+'" aria-label="편집">'+PEN+'</button></div></div>'; });
-    it.dues.forEach(function(t){ var c=CAT[t.cat]||CAT.etc, r=taskRange(t), st=shortStatus(r.start,r.end,t.done,tKey), dt=r.isRange?(fmtDate(r.start)+" ~ "+fmtDate(r.end)):fmtDate(r.end);
-      rows+='<div class="dm-row '+(t.done?"done":"")+'" data-action="edit-task" data-id="'+t.id+'"><button class="dm-check" data-action="toggle-task" data-id="'+t.id+'" aria-label="완료">'+CHECK+'</button><div class="dm-main"><div class="dm-t">'+esc(t.title)+'</div><div class="dm-sub"><span class="cat-chip" style="background:'+c.color+'22;color:'+c.color+'"><span class="cdot" style="background:'+c.color+'"></span>'+c.label+'</span><span class="dm">'+dt+' · '+st.t+'</span></div></div><div class="dm-acts"><button data-action="edit-task" data-id="'+t.id+'" aria-label="편집">'+PEN+'</button><button class="del" data-action="del-task" data-id="'+t.id+'" aria-label="삭제">'+X+'</button></div></div>'; });
+    it.dues.forEach(function(t){ var c=CAT[t.cat]||CAT.etc, r=taskRange(t), st=shortStatus(r.start,r.end,t.done,tKey), dt=r.isRange?(fmtDate(r.start)+" ~ "+fmtDate(r.end)):fmtDate(r.end), examB=(t.type==="exam")?EXAMCHIP:'';
+      rows+='<div class="dm-row '+(t.done?"done":"")+'" data-action="edit-task" data-id="'+t.id+'"><button class="dm-check" data-action="toggle-task" data-id="'+t.id+'" aria-label="완료">'+CHECK+'</button><div class="dm-main"><div class="dm-t">'+esc(t.title)+'</div><div class="dm-sub">'+examB+'<span class="cat-chip" style="background:'+c.color+'22;color:'+c.color+'"><span class="cdot" style="background:'+c.color+'"></span>'+c.label+'</span><span class="dm">'+dt+' · '+st.t+'</span></div>'+(t.note?'<div class="dm-note">'+esc(t.note)+'</div>':'')+'</div><div class="dm-acts"><button data-action="edit-task" data-id="'+t.id+'" aria-label="편집">'+PEN+'</button><button class="del" data-action="del-task" data-id="'+t.id+'" aria-label="삭제">'+X+'</button></div></div>'; });
     it.study.forEach(function(o){ var done=o.s.done&&o.s.done[key];
       rows+='<div class="dm-row '+(done?"done":"")+'" data-action="edit-subject" data-id="'+o.s.id+'"><button class="dm-check" data-action="toggle-study" data-id="'+o.s.id+'" data-key="'+key+'" aria-label="완료">'+CHECK+'</button><div class="dm-main"><div class="dm-t">'+esc(o.s.name)+(o.plan.review?" 전체 복습":" 공부")+'</div><div class="dm-sub">'+(o.plan.review?'<span class="badge2 rv">복습</span>':'')+(o.plan.units.length?'<span class="scope">'+esc(scopeStr(o.plan.units))+'</span>':'<span class="dm">공부 세션</span>')+'</div></div><div class="dm-acts"><button data-action="edit-subject" data-id="'+o.s.id+'" aria-label="편집">'+PEN+'</button></div></div>'; });
     var addCat=filter||"school", holM=holidayName(key);
@@ -879,7 +884,9 @@
       '<div class="modal-body"><div class="field"><label>내용</label><input id="t-title" placeholder="예: 리포트 제출 / 랩미팅 / 공연 리허설" value="'+esc(t.title)+'"></div>'+
       '<div class="field"><label>분류</label><select id="t-cat">'+catOpts+'</select></div>'+
       '<div class="row2"><div class="field"><label>시작일 <span class="hint">여러 날 이어지면 지정</span></label><input id="t-start" type="date" value="'+esc(t.start||"")+'"></div><div class="field"><label>마감/종료일</label><input id="t-due" type="date" value="'+esc(t.due||"")+'"></div></div>'+
-      '<div class="field"><label>연결 과목 <span class="hint">(학교 과제일 때)</span></label><select id="t-subj">'+subjOpts+'</select></div></div>'+
+      '<div class="field"><label>연결 과목 <span class="hint">(학교 과제일 때)</span></label><select id="t-subj">'+subjOpts+'</select></div>'+
+      '<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;color:var(--ink-2)"><input type="checkbox" id="t-exam" '+(t.type==="exam"?"checked":"")+' style="width:auto;margin:0"> 시험/고사로 표시 <span class="hint">캘린더에 빨간색</span></label>'+
+      '<div class="field"><label>메모</label><textarea id="t-note" placeholder="세부 내용·준비물·장소 등">'+esc(t.note||"")+'</textarea></div></div>'+
       '<div class="modal-foot"><button class="btn ghost" data-close>취소</button><button class="btn primary" id="saveTask">'+(edit?"저장":"추가")+'</button></div>';
     modal.querySelectorAll("[data-close]").forEach(function(b){ b.addEventListener("click",closeModal); });
     $("saveTask").addEventListener("click",function(){
@@ -888,7 +895,7 @@
       if(!due && start){ due=start; }
       if(start && due && start>due){ var tmp=start; start=due; due=tmp; }
       if(start===due){ start=""; }   // 단일 일정이면 시작일 비움
-      store.saveTask({id:t.id,title:title,cat:$("t-cat").value,subjectId:$("t-subj").value,start:start,due:due,done:t.done||false}).then(closeModal);
+      store.saveTask({id:t.id,title:title,cat:$("t-cat").value,subjectId:$("t-subj").value,start:start,due:due,type:$("t-exam").checked?"exam":"",note:$("t-note").value.trim(),done:t.done||false}).then(closeModal);
     });
     openScrim("t-title");
   }
