@@ -80,9 +80,16 @@
   .cal-cell.sun .cn{color:var(--sun);} .cal-cell.sat .cn{color:var(--sat);}
   .cal-cell.today .cn{color:#fff;background:var(--accent);border-radius:999px;width:20px;height:20px;display:grid;place-items:center;font-weight:600;}
   .cal-cell.sel{border-color:var(--accent);background:var(--accent-soft);}
+  .cal-cell.hasexam{border-color:var(--urgent);}
   .cal-dots{display:flex;flex-wrap:wrap;gap:3px;margin-top:auto;}
   .cal-dots i{width:6px;height:6px;border-radius:50%;display:block;}
+  .cal-dots i.due{width:7px;height:7px;border-radius:2px;}
   .cal-dots i.ring{box-shadow:0 0 0 1.5px var(--surface-2);}
+  .cal-legend{display:flex;flex-wrap:wrap;gap:13px;padding:0 16px 14px;font-size:11.5px;color:var(--muted);}
+  .cal-legend span{display:inline-flex;align-items:center;gap:5px;}
+  .cal-legend i{width:9px;height:9px;border-radius:50%;display:inline-block;}
+  .cal-legend i.sq{border-radius:2px;}
+  .cal-legend i.exb{width:12px;height:12px;border-radius:3px;background:transparent;border:1.6px solid var(--urgent);}
 
   .next-exam{background:linear-gradient(135deg,var(--accent),#6d63ff);color:#fff;border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow-sm);}
   .next-exam .lbl{font-size:12px;opacity:.82;font-weight:500;}
@@ -251,14 +258,15 @@
     <div class="home-grid">
       <section class="panel">
         <div class="cal-top">
-          <span class="cal-title" id="calTitle"></span>
+          <span class="cal-title" id="calTitle-home"></span>
           <div class="cal-nav">
             <button class="btn icon" data-action="cal-prev" aria-label="이전 달"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg></button>
             <button class="btn" data-action="cal-today">오늘</button>
             <button class="btn icon" data-action="cal-next" aria-label="다음 달"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 18l6-6-6-6"/></svg></button>
           </div>
         </div>
-        <div class="cal-grid" id="calGrid"></div>
+        <div class="cal-grid" id="calGrid-home"></div>
+        <div class="cal-legend"><span><i class="exb"></i>시험</span><span><i class="sq" style="background:var(--soon)"></i>과제 마감</span></div>
       </section>
       <div class="col">
         <div id="nextExam"></div>
@@ -276,6 +284,18 @@
 
   <!-- SCHOOL -->
   <div class="tabpane" id="tab-school" hidden>
+    <section class="panel" style="margin-bottom:18px">
+      <div class="cal-top">
+        <span class="cal-title" id="calTitle-school"></span>
+        <div class="cal-nav">
+          <button class="btn icon" data-action="cal-prev" aria-label="이전 달"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+          <button class="btn" data-action="cal-today">오늘</button>
+          <button class="btn icon" data-action="cal-next" aria-label="다음 달"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 18l6-6-6-6"/></svg></button>
+        </div>
+      </div>
+      <div class="cal-grid" id="calGrid-school"></div>
+      <div class="cal-legend"><span><i class="exb"></i>시험</span><span><i class="sq" style="background:var(--soon)"></i>과제 마감</span><span><i style="background:var(--accent)"></i>공부</span></div>
+    </section>
     <div class="stats" id="stats"></div>
     <div class="col">
       <section class="panel">
@@ -477,7 +497,6 @@
       : "";
 
     buildNav(tKey);
-    renderCalendar(tKey);
     renderNextExam(tKey);
     renderDayDetail(tKey);
     renderUrgent(tKey);
@@ -487,6 +506,7 @@
     renderSchoolTasks(tKey);
     renderMaterials();
     renderCatPane("commsec",tKey); renderCatPane("asc",tKey); renderCatPane("etc",tKey);
+    renderAllCalendars();
     fillPomoSubjects();
     applyTab();
   }
@@ -503,25 +523,40 @@
     }).join("");
   }
 
-  function markersFor(key,tKey){ var s=daySlot(key,tKey), dots=[];
-    s.exams.forEach(function(x){ dots.push({c:subjColor(x),ring:true}); });
-    s.dues.forEach(function(t){ dots.push({c:(CAT[t.cat]||CAT.etc).color}); });
-    s.study.forEach(function(o){ dots.push({c:subjColor(o.s)}); });
-    return dots;
+  // 캘린더 네비게이션 버튼 (분류 탭 캘린더에서 재사용)
+  var CALNAV='<button class="btn icon" data-action="cal-prev" aria-label="이전 달"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg></button><button class="btn" data-action="cal-today">오늘</button><button class="btn icon" data-action="cal-next" aria-label="다음 달"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 18l6-6-6-6"/></svg></button>';
+  function legendHTML(filter){
+    if(filter===null) return '<div class="cal-legend"><span><i class="exb"></i>시험</span><span><i class="sq" style="background:var(--soon)"></i>과제 마감</span></div>';
+    if(filter==="school") return '<div class="cal-legend"><span><i class="exb"></i>시험</span><span><i class="sq" style="background:var(--soon)"></i>과제 마감</span><span><i style="background:var(--accent)"></i>공부</span></div>';
+    var c=CAT[filter]||CAT.etc;
+    return '<div class="cal-legend"><span><i class="sq" style="background:var(--soon)"></i>'+c.label+' 마감/일정</span></div>';
   }
-  function renderCalendar(tKey){
-    $("calTitle").textContent=cal.y+"년 "+(cal.m+1)+"월";
+  // filter: null=홈(시험 테두리+과제, 공부 제외) / "school"=시험+과제+공부 / 그 외 분류=해당 분류 일정만
+  function calData(key,tKey,filter){
+    var s=daySlot(key,tKey), hasExam=false, dots=[];
+    var showExam=(filter===null||filter==="school");
+    var showStudy=(filter==="school");   // 홈에는 공부 표기 안 함
+    if(showExam) s.exams.forEach(function(){ hasExam=true; dots.push({c:"var(--urgent)"}); });
+    if(showStudy) s.study.forEach(function(o){ dots.push({c:subjColor(o.s)}); });
+    s.dues.forEach(function(t){ if(filter===null||(t.cat||"etc")===filter) dots.push({c:"var(--soon)",due:true}); });
+    return {hasExam:hasExam,dots:dots};
+  }
+  function renderCalInto(tab, filter, tKey){
+    var grid=$("calGrid-"+tab); if(!grid) return;
+    var ttl=$("calTitle-"+tab); if(ttl) ttl.textContent=cal.y+"년 "+(cal.m+1)+"월";
     var first=new Date(cal.y,cal.m,1), gridStart=new Date(cal.y,cal.m,1-first.getDay());
     var html="";
     for(var w=0;w<7;w++){ html+='<div class="cal-wd '+(w===0?"sun":w===6?"sat":"")+'">'+WD[w]+'</div>'; }
     for(var i=0;i<42;i++){
       var cd=new Date(gridStart.getTime()+i*DAY), k=keyOf(cd), other=cd.getMonth()!==cal.m, dow=cd.getDay();
-      var dots=markersFor(k,tKey).slice(0,5).map(function(dt){return '<i class="'+(dt.ring?"ring":"")+'" style="background:'+dt.c+'"></i>';}).join("");
-      var cls="cal-cell"+(other?" other":"")+(k===tKey?" today":(dow===0?" sun":dow===6?" sat":""))+(k===selKey?" sel":"");
+      var cdta=calData(k,tKey,filter);
+      var dots=cdta.dots.slice(0,5).map(function(dt){return '<i class="'+(dt.due?"due":"")+(dt.ring?" ring":"")+'" style="background:'+dt.c+'"></i>';}).join("");
+      var cls="cal-cell"+(other?" other":"")+(k===tKey?" today":(dow===0?" sun":dow===6?" sat":""))+(k===selKey?" sel":"")+(cdta.hasExam?" hasexam":"");
       html+='<button class="'+cls+'" data-action="cal-day" data-key="'+k+'"><span class="cn">'+cd.getDate()+'</span><span class="cal-dots">'+dots+'</span></button>';
     }
-    $("calGrid").innerHTML=html;
+    grid.innerHTML=html;
   }
+  function renderAllCalendars(){ var t=todayKey(); renderCalInto("home",null,t); renderCalInto("school","school",t); renderCalInto("commsec","commsec",t); renderCalInto("asc","asc",t); renderCalInto("etc","etc",t); }
   function renderNextExam(tKey){
     var up=Object.keys(subjects()).map(function(id){return subjects()[id];}).filter(function(s){return diffDays(tKey,s.exam)>=0;}).sort(function(a,b){return a.exam<b.exam?-1:1;});
     var n0=up[0];
@@ -537,9 +572,6 @@
     s.exams.forEach(function(x){ items+='<div class="titem"><span class="dot" style="background:'+subjColor(x)+'"></span><span class="badge2 ex">시험</span><span class="tx">'+esc(x.name)+'</span></div>'; });
     s.dues.forEach(function(t){ var sc=(CAT[t.cat]||CAT.etc).color;
       items+='<div class="titem '+(t.done?"done":"")+'"><span class="dot" style="background:'+sc+'"></span><span class="badge2 du">'+(CAT[t.cat]||CAT.etc).label+'</span><span class="tx">'+esc(t.title)+'</span></div>'; });
-    s.study.forEach(function(o){ var done=o.s.done&&o.s.done[selKey];
-      items+='<div class="titem '+(done?"done":"")+'"><span class="dot" style="background:'+subjColor(o.s)+'"></span>'+(o.plan.review?'<span class="badge2 rv">복습</span>':'')+'<span class="tx">'+esc(o.s.name)+(o.plan.review?' 전체 복습':' 공부')+(o.plan.units.length?' <span class="scope">· '+esc(scopeStr(o.plan.units))+'</span>':'')+'</span>'+
-        (nRel>=0?'<button class="btn ghost" style="padding:2px 7px;font-size:11px" data-action="toggle-study" data-id="'+o.s.id+'" data-key="'+selKey+'">'+(done?"완료됨":"완료")+'</button>':'')+'</div>'; });
     if(!items) items='<div class="empty-line">이 날은 별다른 일정이 없어요.</div>';
     $("dayDetail").innerHTML='<div class="dh"><span class="rel">'+rel+'</span></div><div class="items">'+items+'</div>';
   }
@@ -659,8 +691,9 @@
     var body = ids.length
       ? '<div class="asn-list">'+arr.map(function(t){return taskRow(t,subs,tKey);}).join("")+'</div>'
       : '<div class="panel-empty">'+c.label+' 일정이 없어요.<br>아래 버튼으로 추가하세요.</div>';
+    var calPanel='<section class="panel"><div class="cal-top"><span class="cal-title" id="calTitle-'+cat+'"></span><div class="cal-nav">'+CALNAV+'</div></div><div class="cal-grid" id="calGrid-'+cat+'"></div>'+legendHTML(cat)+'</section>';
     $("pane-"+cat).innerHTML=
-      '<div class="col"><section class="panel">'+
+      '<div class="col">'+calPanel+'<section class="panel">'+
         '<div class="panel-head"><h2><span class="cat-head"><span class="cdot" style="background:'+c.color+'"></span>'+c.label+' 일정</span></h2>'+
           '<div style="display:flex;gap:8px;align-items:center"><span class="count">'+(ids.length?open+" / "+ids.length:"")+'</span><button class="btn primary" style="padding:6px 11px" data-action="add-task" data-cat="'+cat+'"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>추가</button></div></div>'+
         '<div class="panel-body">'+body+'</div></section></div>';
@@ -686,10 +719,10 @@
     if(act==="del-task"){ if(guardDemo())return; if(confirm("이 일정을 삭제할까요?")) store.deleteTask(id); return; }
     if(act==="toggle-task"){ if(guardDemo())return; var a=Object.assign({},tasks()[id]); a.done=!a.done; store.saveTask(a); return; }
     if(act==="toggle-study"){ if(guardDemo())return; var s=Object.assign({},subjects()[id]); s.done=Object.assign({},s.done); var k=t.getAttribute("data-key")||todayKey(); if(s.done[k])delete s.done[k]; else s.done[k]=true; store.saveSubject(s); return; }
-    if(act==="cal-prev"){ cal.m--; if(cal.m<0){cal.m=11;cal.y--;} renderCalendar(todayKey()); return; }
-    if(act==="cal-next"){ cal.m++; if(cal.m>11){cal.m=0;cal.y++;} renderCalendar(todayKey()); return; }
-    if(act==="cal-today"){ var d=new Date(); cal.y=d.getFullYear(); cal.m=d.getMonth(); selKey=todayKey(); renderCalendar(todayKey()); renderDayDetail(todayKey()); return; }
-    if(act==="cal-day"){ selKey=t.getAttribute("data-key"); renderCalendar(todayKey()); renderDayDetail(todayKey()); return; }
+    if(act==="cal-prev"){ cal.m--; if(cal.m<0){cal.m=11;cal.y--;} renderAllCalendars(); return; }
+    if(act==="cal-next"){ cal.m++; if(cal.m>11){cal.m=0;cal.y++;} renderAllCalendars(); return; }
+    if(act==="cal-today"){ var d=new Date(); cal.y=d.getFullYear(); cal.m=d.getMonth(); selKey=todayKey(); renderAllCalendars(); renderDayDetail(todayKey()); return; }
+    if(act==="cal-day"){ selKey=t.getAttribute("data-key"); renderAllCalendars(); renderDayDetail(todayKey()); return; }
   });
 
   /* ===== 모달 ===== */
