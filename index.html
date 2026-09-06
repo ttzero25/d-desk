@@ -70,7 +70,7 @@
   .cal-title{font-family:var(--mono);font-size:16px;font-weight:600;}
   .cal-nav{display:flex;gap:5px;align-items:center;}
   .cal-nav .btn{padding:6px 9px;}
-  .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;padding:12px 14px 14px;}
+  .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;padding:12px 14px 14px;}
   .cal-wd{text-align:center;font-size:11px;color:var(--muted);font-weight:600;padding:2px 0 4px;}
   .cal-wd.sun{color:var(--sun);} .cal-wd.sat{color:var(--sat);}
   .cal-cell{min-height:58px;border-radius:8px;border:1.5px solid transparent;padding:5px 6px 4px;background:var(--surface-2);display:flex;flex-direction:column;gap:3px;text-align:left;transition:.1s;}
@@ -85,6 +85,12 @@
   .cal-dots i{width:6px;height:6px;border-radius:50%;display:block;}
   .cal-dots i.due{width:7px;height:7px;border-radius:2px;}
   .cal-dots i.ring{box-shadow:0 0 0 1.5px var(--surface-2);}
+  .cal-bars{display:flex;flex-direction:column;gap:2px;margin:3px -6px 0;}
+  .cal-bar{height:5px;border-radius:1px;display:block;}
+  .cal-bar.spacer{background:transparent!important;}
+  .cal-bar.done{opacity:.45;}
+  .cal-cell.holiday:not(.today) .cn{color:var(--sun);}
+  .cal-hol{font-size:9px;line-height:1.1;color:var(--sun);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;font-weight:500;}
   .cal-legend{display:flex;flex-wrap:wrap;gap:13px;padding:0 16px 14px;font-size:11.5px;color:var(--muted);}
   .cal-legend span{display:inline-flex;align-items:center;gap:5px;}
   .cal-legend i{width:9px;height:9px;border-radius:50%;display:inline-block;}
@@ -383,6 +389,13 @@
   var TABS=[
     {id:"home",label:"Home"}, {id:"school",label:"School"}, {id:"commsec",label:"CommSec"}, {id:"asc",label:"ASC"}, {id:"etc",label:"Etc"}
   ];
+  // 대한민국 공휴일: 매년 고정 + 연도별(음력·대체) 표(2025~2026 내장, 이후 확장 가능)
+  var HOLIDAY_FIXED={ "01-01":"신정","03-01":"삼일절","05-05":"어린이날","06-06":"현충일","08-15":"광복절","10-03":"개천절","10-09":"한글날","12-25":"성탄절" };
+  var HOLIDAY_DATE={
+    "2025-01-28":"설날","2025-01-29":"설날","2025-01-30":"설날","2025-03-03":"대체공휴일","2025-05-06":"대체공휴일","2025-10-05":"추석","2025-10-06":"추석","2025-10-07":"추석","2025-10-08":"대체공휴일",
+    "2026-02-16":"설날","2026-02-17":"설날","2026-02-18":"설날","2026-03-02":"대체공휴일","2026-05-24":"부처님오신날","2026-05-25":"대체공휴일","2026-09-24":"추석","2026-09-25":"추석","2026-09-26":"추석","2026-09-28":"대체공휴일"
+  };
+  function holidayName(key){ if(HOLIDAY_DATE[key]) return HOLIDAY_DATE[key]; return HOLIDAY_FIXED[key.slice(5)]||null; }
 
   function pad(n){ return (n<10?"0":"")+n; }
   function keyOf(d){ return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate()); }
@@ -561,33 +574,43 @@
   // 캘린더 네비게이션 버튼 (분류 탭 캘린더에서 재사용)
   var CALNAV='<button class="btn icon" data-action="cal-prev" aria-label="이전 달"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg></button><button class="btn" data-action="cal-today">오늘</button><button class="btn icon" data-action="cal-next" aria-label="다음 달"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 18l6-6-6-6"/></svg></button>';
   function legendHTML(filter){
-    if(filter===null) return '<div class="cal-legend"><span><i class="exb"></i>시험</span><span><i class="sq" style="background:var(--soon)"></i>과제 마감</span></div>';
+    if(filter===null) return '<div class="cal-legend"><span><i class="exb"></i>시험</span>'+CATS.map(function(c){return '<span><i class="sq" style="background:'+CAT[c].color+'"></i>'+CAT[c].label+'</span>';}).join("")+'</div>';
     if(filter==="school") return '<div class="cal-legend"><span><i class="exb"></i>시험</span><span><i class="sq" style="background:var(--soon)"></i>과제 마감</span><span><i style="background:var(--accent)"></i>공부</span></div>';
     var c=CAT[filter]||CAT.etc;
     return '<div class="cal-legend"><span><i class="sq" style="background:var(--soon)"></i>'+c.label+' 마감/일정</span></div>';
   }
-  // filter: null=홈(시험 테두리+과제, 공부 제외) / "school"=시험+과제+공부 / 그 외 분류=해당 분류 일정만
-  function calData(key,tKey,filter){
-    var s=daySlot(key,tKey), hasExam=false, dots=[];
-    var showExam=(filter===null||filter==="school");
-    var showStudy=(filter==="school");   // 홈에는 공부 표기 안 함
-    if(showExam) s.exams.forEach(function(){ hasExam=true; dots.push({c:"var(--urgent)"}); });
-    if(showStudy) s.study.forEach(function(o){ dots.push({c:subjColor(o.s)}); });
-    s.dues.forEach(function(t){ if(filter===null||(t.cat||"etc")===filter) dots.push({c:"var(--soon)",due:true}); });
-    return {hasExam:hasExam,dots:dots};
-  }
+  // filter: null=홈(시험 테두리+모든 분류 과제, 공부 제외) / "school"=시험+과제+공부 / 그 외 분류=해당 분류만
   function renderCalInto(tab, filter, tKey){
     var grid=$("calGrid-"+tab); if(!grid) return;
     var ttl=$("calTitle-"+tab); if(ttl) ttl.textContent=cal.y+"년 "+(cal.m+1)+"월";
     var first=new Date(cal.y,cal.m,1), gridStart=new Date(cal.y,cal.m,1-first.getDay());
+    var visStart=keyOf(gridStart), visEnd=keyOf(new Date(gridStart.getTime()+41*DAY));
+    var showExam=(filter===null||filter==="school"), showStudy=(filter==="school");
+    var tk=tasks(), inFilter=function(t){ return filter===null||(t.cat||"etc")===filter; };
+    // 연결(여러 날) 일정 → 겹치지 않게 레인 배치
+    var rTasks=Object.keys(tk).map(function(id){return tk[id];}).filter(function(t){ if(!inFilter(t))return false; var r=taskRange(t); return r&&r.isRange&&!(r.end<visStart||r.start>visEnd); })
+      .sort(function(a,b){ var ra=taskRange(a),rb=taskRange(b); if(ra.start!==rb.start)return ra.start<rb.start?-1:1; if(ra.end!==rb.end)return ra.end>rb.end?-1:1; return a.id<b.id?-1:1; });
+    var laneEnds=[], laneOf={};
+    rTasks.forEach(function(t){ var r=taskRange(t), placed=-1; for(var l=0;l<laneEnds.length;l++){ if(laneEnds[l]<r.start){ placed=l; break; } } if(placed<0){ placed=laneEnds.length; laneEnds.push(r.end); } else laneEnds[placed]=r.end; laneOf[t.id]=placed; });
+    var MAXLANE=3, laneCount=Math.min(laneEnds.length,MAXLANE);
     var html="";
     for(var w=0;w<7;w++){ html+='<div class="cal-wd '+(w===0?"sun":w===6?"sat":"")+'">'+WD[w]+'</div>'; }
     for(var i=0;i<42;i++){
       var cd=new Date(gridStart.getTime()+i*DAY), k=keyOf(cd), other=cd.getMonth()!==cal.m, dow=cd.getDay();
-      var cdta=calData(k,tKey,filter);
-      var dots=cdta.dots.slice(0,5).map(function(dt){return '<i class="'+(dt.due?"due":"")+(dt.ring?" ring":"")+'" style="background:'+dt.c+'"></i>';}).join("");
-      var cls="cal-cell"+(other?" other":"")+(k===tKey?" today":(dow===0?" sun":dow===6?" sat":""))+(k===selKey?" sel":"")+(cdta.hasExam?" hasexam":"");
-      html+='<button class="'+cls+'" data-action="cal-day" data-key="'+k+'"><span class="cn">'+cd.getDate()+'</span><span class="cal-dots">'+dots+'</span></button>';
+      var s=daySlot(k,tKey), hasExam=false, dotsArr=[], bars="";
+      for(var l=0;l<laneCount;l++){
+        var bt=null; for(var ri=0;ri<rTasks.length;ri++){ if(laneOf[rTasks[ri].id]===l && taskCoversDay(rTasks[ri],k)){ bt=rTasks[ri]; break; } }
+        if(bt){ var br=taskRange(bt), bc=CAT[bt.cat]||CAT.etc, isS=(k===br.start), isE=(k===br.end);
+          var rad=(isS?"border-top-left-radius:4px;border-bottom-left-radius:4px;":"")+(isE?"border-top-right-radius:4px;border-bottom-right-radius:4px;":"");
+          bars+='<span class="cal-bar'+(bt.done?" done":"")+'" style="background:'+bc.color+';'+rad+'"></span>';
+        } else bars+='<span class="cal-bar spacer"></span>';
+      }
+      if(showExam) s.exams.forEach(function(){ hasExam=true; dotsArr.push('<i style="background:var(--urgent)"></i>'); });
+      if(showStudy) s.study.forEach(function(o){ dotsArr.push('<i style="background:'+subjColor(o.s)+'"></i>'); });
+      s.dues.forEach(function(t){ if(!inFilter(t))return; var r=taskRange(t); if(r&&r.isRange&&laneOf[t.id]!==undefined&&laneOf[t.id]<MAXLANE) return; var col=(filter===null)?(CAT[t.cat]||CAT.etc).color:"var(--soon)"; dotsArr.push('<i class="due" style="background:'+col+'"></i>'); });
+      var hol=holidayName(k);
+      var cls="cal-cell"+(other?" other":"")+(k===tKey?" today":(dow===0?" sun":dow===6?" sat":""))+(k===selKey?" sel":"")+(hasExam?" hasexam":"")+(hol?" holiday":"");
+      html+='<button class="'+cls+'" data-action="cal-day" data-key="'+k+'"><span class="cn">'+cd.getDate()+'</span>'+(hol?'<span class="cal-hol">'+esc(hol)+'</span>':'')+(bars?'<span class="cal-bars">'+bars+'</span>':'')+'<span class="cal-dots">'+dotsArr.slice(0,4).join("")+'</span></button>';
     }
     grid.innerHTML=html;
   }
@@ -602,7 +625,8 @@
   function renderDayDetail(tKey){
     var s=daySlot(selKey,tKey), nRel=diffDays(tKey,selKey), sd=parseKey(selKey);
     var rel=nRel===0?"오늘":nRel===1?"내일":nRel===-1?"어제":ddayLabel(nRel);
-    $("dayTitle").textContent=(sd.getMonth()+1)+"월 "+sd.getDate()+"일 ("+WD[sd.getDay()]+")";
+    var holD=holidayName(selKey);
+    $("dayTitle").textContent=(sd.getMonth()+1)+"월 "+sd.getDate()+"일 ("+WD[sd.getDay()]+")"+(holD?" · "+holD:"");
     var items="";
     s.exams.forEach(function(x){ items+='<div class="titem"><span class="dot" style="background:'+subjColor(x)+'"></span><span class="badge2 ex">시험</span><span class="tx">'+esc(x.name)+'</span></div>'; });
     s.dues.forEach(function(t){ var sc=(CAT[t.cat]||CAT.etc).color;
@@ -790,8 +814,8 @@
       rows+='<div class="dm-row '+(t.done?"done":"")+'" data-action="edit-task" data-id="'+t.id+'"><button class="dm-check" data-action="toggle-task" data-id="'+t.id+'" aria-label="완료">'+CHECK+'</button><div class="dm-main"><div class="dm-t">'+esc(t.title)+'</div><div class="dm-sub"><span class="cat-chip" style="background:'+c.color+'22;color:'+c.color+'"><span class="cdot" style="background:'+c.color+'"></span>'+c.label+'</span><span class="dm">'+dt+' · '+st.t+'</span></div></div><div class="dm-acts"><button data-action="edit-task" data-id="'+t.id+'" aria-label="편집">'+PEN+'</button><button class="del" data-action="del-task" data-id="'+t.id+'" aria-label="삭제">'+X+'</button></div></div>'; });
     it.study.forEach(function(o){ var done=o.s.done&&o.s.done[key];
       rows+='<div class="dm-row '+(done?"done":"")+'" data-action="edit-subject" data-id="'+o.s.id+'"><button class="dm-check" data-action="toggle-study" data-id="'+o.s.id+'" data-key="'+key+'" aria-label="완료">'+CHECK+'</button><div class="dm-main"><div class="dm-t">'+esc(o.s.name)+(o.plan.review?" 전체 복습":" 공부")+'</div><div class="dm-sub">'+(o.plan.review?'<span class="badge2 rv">복습</span>':'')+(o.plan.units.length?'<span class="scope">'+esc(scopeStr(o.plan.units))+'</span>':'<span class="dm">공부 세션</span>')+'</div></div><div class="dm-acts"><button data-action="edit-subject" data-id="'+o.s.id+'" aria-label="편집">'+PEN+'</button></div></div>'; });
-    var addCat=filter||"school";
-    modal.innerHTML='<div class="modal-head"><h3>'+(d.getMonth()+1)+'월 '+d.getDate()+'일 ('+WD[d.getDay()]+') <span style="font-family:var(--mono);font-size:12px;color:var(--accent);font-weight:600;margin-left:6px">'+rel+'</span></h3><button class="btn icon ghost" data-close>'+X+'</button></div>'+
+    var addCat=filter||"school", holM=holidayName(key);
+    modal.innerHTML='<div class="modal-head"><h3>'+(d.getMonth()+1)+'월 '+d.getDate()+'일 ('+WD[d.getDay()]+')'+(holM?' <span style="color:var(--sun);font-size:12px;font-weight:600">'+esc(holM)+'</span>':'')+' <span style="font-family:var(--mono);font-size:12px;color:var(--accent);font-weight:600;margin-left:6px">'+rel+'</span></h3><button class="btn icon ghost" data-close>'+X+'</button></div>'+
       '<div class="modal-body"><div class="dm-list">'+rows+'</div><button class="btn dm-add" data-action="add-task" data-cat="'+addCat+'" data-due="'+key+'"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>이 날 일정 추가</button></div>';
     modal.querySelectorAll("[data-close]").forEach(function(b){ b.addEventListener("click",closeModal); });
     scrim.classList.add("open");
