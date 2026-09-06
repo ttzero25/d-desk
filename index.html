@@ -701,8 +701,8 @@
   }
 
   /* ===== School 캘린더 과목 색상 범례 ===== */
-  // 캘린더 표기용 과목명: '중간'(중간고사) 표기 제거
-  function calSubjName(name){ return String(name||"").replace(/\s*중간(고사)?\s*/g," ").replace(/\s+/g," ").trim(); }
+  // 캘린더 표기용 과목명: '중간'(중간고사)·'기말'(기말고사) 표기 제거
+  function calSubjName(name){ return String(name||"").replace(/\s*(중간|기말)(고사)?\s*/g," ").replace(/\s+/g," ").trim(); }
   function renderSchoolLegend(){
     var host=$("calLegend-school"); if(!host) return;
     var subs=subjects(), ids=Object.keys(subs);
