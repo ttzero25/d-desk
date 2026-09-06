@@ -207,6 +207,27 @@
   .modal-foot{display:flex;justify-content:flex-end;gap:8px;padding:14px 18px;border-top:1px solid var(--line);}
   :focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
 
+  /* Day-detail modal rows */
+  .dm-list{display:flex;flex-direction:column;gap:8px;}
+  .dm-row{display:flex;align-items:center;gap:10px;padding:10px 11px;border:1px solid var(--line);border-radius:9px;background:var(--surface-2);cursor:pointer;text-align:left;transition:.1s;}
+  .dm-row:hover{border-color:var(--accent);}
+  .dm-row .dot{width:9px;height:9px;border-radius:50%;flex:none;}
+  .dm-row .dm-main{flex:1;min-width:0;}
+  .dm-row .dm-t{font-size:14px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .dm-row.done .dm-t{text-decoration:line-through;color:var(--muted);}
+  .dm-row .dm-sub{font-size:12px;color:var(--muted);margin-top:2px;display:flex;gap:7px;align-items:center;flex-wrap:wrap;}
+  .dm-row .dm-sub .dm{font-family:var(--mono);}
+  .dm-row .dm-sub .scope{font-family:var(--mono);}
+  .dm-row .dm-acts{display:flex;gap:2px;flex:none;}
+  .dm-row .dm-acts button{border:none;background:none;color:var(--muted);padding:5px;display:inline-flex;border-radius:6px;}
+  .dm-row .dm-acts button svg{width:15px;height:15px;}
+  .dm-row .dm-acts button:hover{color:var(--accent);background:var(--surface);}
+  .dm-row .dm-acts .del:hover{color:var(--urgent);}
+  .dm-check{width:22px;height:22px;border:1.6px solid var(--line-strong);border-radius:6px;background:var(--surface);display:grid;place-items:center;padding:0;flex:none;}
+  .dm-check svg{width:12px;height:12px;opacity:0;color:#fff;}
+  .dm-row.done .dm-check{background:var(--safe);border-color:var(--safe);} .dm-row.done .dm-check svg{opacity:1;}
+  .dm-add{margin-top:12px;width:100%;justify-content:center;}
+
   /* Pomodoro */
   .pomo-fab{position:fixed;right:20px;bottom:20px;z-index:55;width:54px;height:54px;border-radius:50%;background:var(--accent);color:#fff;border:none;box-shadow:var(--shadow-md);display:grid;place-items:center;}
   .pomo-fab svg{width:24px;height:24px;} .pomo-fab .mini{position:absolute;bottom:-6px;left:50%;transform:translateX(-50%);font-family:var(--mono);font-size:10px;background:var(--ink);color:var(--bg);padding:1px 6px;border-radius:999px;display:none;}
@@ -494,7 +515,7 @@
   var scopeStr=function(u){ return u&&u.length?u.join(", "):""; };
 
   /* ===== 상태 ===== */
-  var cal={y:0,m:0}, selKey=null, activeTab="home";
+  var cal={y:0,m:0}, selKey=null, activeTab="home", dayModalKey=null;
   try{ activeTab=localStorage.getItem("dd_tab")||"home"; }catch(e){}
   if (["home","school","commsec","asc","etc"].indexOf(activeTab)<0) activeTab="home";
 
@@ -522,6 +543,7 @@
     renderAllCalendars();
     fillPomoSubjects();
     applyTab();
+    if(dayModalKey!=null) refreshDayModal();
   }
 
   function catBadgeCount(cat, tKey){
@@ -729,7 +751,7 @@
     var t=e.target.closest("[data-action]"); if(!t)return;
     var act=t.getAttribute("data-action"), id=t.getAttribute("data-id");
     if(act==="add-subject") return openSubjectModal(null);
-    if(act==="add-task"){ if(guardDemo())return; return openTaskModal(null, t.getAttribute("data-cat")||null); }
+    if(act==="add-task"){ if(guardDemo())return; return openTaskModal(null, t.getAttribute("data-cat")||null, t.getAttribute("data-due")||null); }
     if(act==="edit-subject"){ if(guardDemo())return; return openSubjectModal(subjects()[id]); }
     if(act==="edit-task"){ if(guardDemo())return; return openTaskModal(tasks()[id]); }
     if(act==="del-subject"){ if(guardDemo())return; if(confirm("이 과목을 삭제할까요?")) store.deleteSubject(id); return; }
@@ -739,14 +761,39 @@
     if(act==="cal-prev"){ cal.m--; if(cal.m<0){cal.m=11;cal.y--;} renderAllCalendars(); return; }
     if(act==="cal-next"){ cal.m++; if(cal.m>11){cal.m=0;cal.y++;} renderAllCalendars(); return; }
     if(act==="cal-today"){ var d=new Date(); cal.y=d.getFullYear(); cal.m=d.getMonth(); selKey=todayKey(); renderAllCalendars(); renderDayDetail(todayKey()); return; }
-    if(act==="cal-day"){ selKey=t.getAttribute("data-key"); renderAllCalendars(); renderDayDetail(todayKey()); return; }
+    if(act==="cal-day"){ selKey=t.getAttribute("data-key"); renderAllCalendars(); renderDayDetail(todayKey()); openDayModal(selKey); return; }
   });
 
   /* ===== 모달 ===== */
   var scrim=$("scrim"), modal=$("modal");
-  function closeModal(){ scrim.classList.remove("open"); modal.innerHTML=""; }
+  function closeModal(){ scrim.classList.remove("open"); modal.innerHTML=""; dayModalKey=null; }
   scrim.addEventListener("click",function(e){ if(e.target===scrim) closeModal(); });
   document.addEventListener("keydown",function(e){ if(e.key==="Escape") closeModal(); });
+
+  /* ===== 날짜 상세 팝업 (모든 캘린더 공용) ===== */
+  function tabFilter(){ return activeTab==="home"?null:activeTab; }
+  function dayItems(key,filter,tKey){ var s=daySlot(key,tKey); var showExam=(filter===null||filter==="school"), showStudy=(filter==="school");
+    return { exams:showExam?s.exams:[], study:showStudy?s.study:[], dues:s.dues.filter(function(t){return filter===null||(t.cat||"etc")===filter;}) }; }
+  function dayItemCount(it){ return it.exams.length+it.dues.length+it.study.length; }
+  function openDayModal(key){
+    var tKey=todayKey(), filter=tabFilter(), it=dayItems(key,filter,tKey);
+    if(dayItemCount(it)===0){ dayModalKey=null; return; }
+    dayModalKey=key;
+    var d=parseKey(key), nRel=diffDays(tKey,key), rel=nRel===0?"오늘":nRel===1?"내일":nRel===-1?"어제":ddayLabel(nRel);
+    var rows="";
+    it.exams.forEach(function(x){ var n=diffDays(tKey,x.exam);
+      rows+='<div class="dm-row" data-action="edit-subject" data-id="'+x.id+'"><span class="dot" style="background:'+subjColor(x)+'"></span><div class="dm-main"><div class="dm-t">'+esc(x.name)+' 시험</div><div class="dm-sub"><span class="badge2 ex">시험</span><span class="dm">'+fmtDate(x.exam)+' · '+ddayLabel(n)+'</span></div></div><div class="dm-acts"><button data-action="edit-subject" data-id="'+x.id+'" aria-label="편집">'+PEN+'</button></div></div>'; });
+    it.dues.forEach(function(t){ var c=CAT[t.cat]||CAT.etc, r=taskRange(t), st=shortStatus(r.start,r.end,t.done,tKey), dt=r.isRange?(fmtDate(r.start)+" ~ "+fmtDate(r.end)):fmtDate(r.end);
+      rows+='<div class="dm-row '+(t.done?"done":"")+'" data-action="edit-task" data-id="'+t.id+'"><button class="dm-check" data-action="toggle-task" data-id="'+t.id+'" aria-label="완료">'+CHECK+'</button><div class="dm-main"><div class="dm-t">'+esc(t.title)+'</div><div class="dm-sub"><span class="cat-chip" style="background:'+c.color+'22;color:'+c.color+'"><span class="cdot" style="background:'+c.color+'"></span>'+c.label+'</span><span class="dm">'+dt+' · '+st.t+'</span></div></div><div class="dm-acts"><button data-action="edit-task" data-id="'+t.id+'" aria-label="편집">'+PEN+'</button><button class="del" data-action="del-task" data-id="'+t.id+'" aria-label="삭제">'+X+'</button></div></div>'; });
+    it.study.forEach(function(o){ var done=o.s.done&&o.s.done[key];
+      rows+='<div class="dm-row '+(done?"done":"")+'" data-action="edit-subject" data-id="'+o.s.id+'"><button class="dm-check" data-action="toggle-study" data-id="'+o.s.id+'" data-key="'+key+'" aria-label="완료">'+CHECK+'</button><div class="dm-main"><div class="dm-t">'+esc(o.s.name)+(o.plan.review?" 전체 복습":" 공부")+'</div><div class="dm-sub">'+(o.plan.review?'<span class="badge2 rv">복습</span>':'')+(o.plan.units.length?'<span class="scope">'+esc(scopeStr(o.plan.units))+'</span>':'<span class="dm">공부 세션</span>')+'</div></div><div class="dm-acts"><button data-action="edit-subject" data-id="'+o.s.id+'" aria-label="편집">'+PEN+'</button></div></div>'; });
+    var addCat=filter||"school";
+    modal.innerHTML='<div class="modal-head"><h3>'+(d.getMonth()+1)+'월 '+d.getDate()+'일 ('+WD[d.getDay()]+') <span style="font-family:var(--mono);font-size:12px;color:var(--accent);font-weight:600;margin-left:6px">'+rel+'</span></h3><button class="btn icon ghost" data-close>'+X+'</button></div>'+
+      '<div class="modal-body"><div class="dm-list">'+rows+'</div><button class="btn dm-add" data-action="add-task" data-cat="'+addCat+'" data-due="'+key+'"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>이 날 일정 추가</button></div>';
+    modal.querySelectorAll("[data-close]").forEach(function(b){ b.addEventListener("click",closeModal); });
+    scrim.classList.add("open");
+  }
+  function refreshDayModal(){ if(dayModalKey==null) return; var k=dayModalKey; if(dayItemCount(dayItems(k,tabFilter(),todayKey()))===0){ closeModal(); return; } openDayModal(k); }
 
   function planSummary(exam, workload, scope){
     if(!exam) return "시험 날짜를 입력하면 추천 시작일과 하루 공부량을 계산해 드려요.";
@@ -764,6 +811,7 @@
   }
 
   function openSubjectModal(s){
+    dayModalKey=null;
     var edit=!!s; s=s||{name:"",exam:"",workload:2,scope:"",colorIdx:pickColorIdx(),materials:[],done:{}};
     var mats=(s.materials&&s.materials.length)?s.materials.slice():[{label:"",url:""}];
     modal.innerHTML='<div class="modal-head"><h3>'+(edit?"과목 편집":"과목 추가")+'</h3><button class="btn icon ghost" data-close>'+X+'</button></div>'+
@@ -793,8 +841,9 @@
     openScrim("f-name");
   }
 
-  function openTaskModal(t, presetCat){
-    var edit=!!t; t=t||{title:"",cat:presetCat||"school",subjectId:"",due:"",done:false};
+  function openTaskModal(t, presetCat, presetDue){
+    dayModalKey=null;
+    var edit=!!t; t=t||{title:"",cat:presetCat||"school",subjectId:"",due:presetDue||"",done:false};
     var subs=subjects();
     var catOpts=CATS.map(function(c){return '<option value="'+c+'" '+(t.cat===c?"selected":"")+'>'+CAT[c].label+' ('+c+')</option>';}).join("");
     var subjOpts='<option value="">과목 연결 안 함</option>'+Object.keys(subs).map(function(id){return '<option value="'+id+'" '+(t.subjectId===id?"selected":"")+'>'+esc(subs[id].name)+'</option>';}).join("");
