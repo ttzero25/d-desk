@@ -761,7 +761,10 @@
     if(act==="cal-prev"){ cal.m--; if(cal.m<0){cal.m=11;cal.y--;} renderAllCalendars(); return; }
     if(act==="cal-next"){ cal.m++; if(cal.m>11){cal.m=0;cal.y++;} renderAllCalendars(); return; }
     if(act==="cal-today"){ var d=new Date(); cal.y=d.getFullYear(); cal.m=d.getMonth(); selKey=todayKey(); renderAllCalendars(); renderDayDetail(todayKey()); return; }
-    if(act==="cal-day"){ selKey=t.getAttribute("data-key"); renderAllCalendars(); renderDayDetail(todayKey()); openDayModal(selKey); return; }
+    if(act==="cal-day"){ selKey=t.getAttribute("data-key"); renderAllCalendars(); renderDayDetail(todayKey());
+      if(dayItemCount(dayItems(selKey,tabFilter(),todayKey()))>0){ openDayModal(selKey); }
+      else { if(guardDemo())return; openTaskModal(null, tabFilter()||"school", selKey); }
+      return; }
   });
 
   /* ===== 모달 ===== */
