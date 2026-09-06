@@ -411,6 +411,11 @@
   var PALETTE=["#4f46e5","#0ea5e9","#0f8a5f","#c2700a","#db2777","#7c3aed","#0891b2","#b45309"];
   var WORKLOAD={1:{label:"가볍게",upd:1},2:{label:"보통",upd:2},3:{label:"빡세게",upd:3}};
   var DAY=86400000, WD=["일","월","화","수","목","금","토"];
+  // 요일별 수업 수(getDay: 0=일 … 6=토). 공강·주말일수록 공부 여유가 큼 → 학습 배분 가중치↑
+  //  월: 데이터통신·정보보호프로젝트2 / 화: AI보안·운영체제 / 수: 소프트웨어특강2·데이터통신·생명정보과학 / 목: 운영체제 / 금: 공강
+  var TIMETABLE={0:0, 1:2, 2:2, 3:3, 4:1, 5:0, 6:0};
+  // 하루 학습 배분 가중치: 수업 없음(금공강/주말)=3, 1과목=2, 2과목=1.4, 3과목이상=1
+  function dayCapacity(key){ var c=TIMETABLE[parseKey(key).getDay()]; if(c==null)c=1; return c<=0?3:c===1?2:c===2?1.4:1; }
   var CATS=["school","commsec","asc","etc"];
   var CAT={ school:{label:"학교",color:"#4f46e5"}, commsec:{label:"연구실",color:"#0891b2"}, asc:{label:"동아리",color:"#db2777"}, etc:{label:"기타",color:"#79828f"} };
   var TABS=[
@@ -560,20 +565,25 @@
       if(allUnits.length===0){
         var count=Math.max(2, Math.min(Math.round(usable.length*(upd/4+0.25)), cover.length||1));
         var chosen=[];
-        if(cover.length){ if(count>=cover.length) chosen=cover.slice(); else for(var i2=0;i2<count;i2++) chosen.push(cover[Math.round(i2*(cover.length-1)/(count-1))]); }
+        if(cover.length){
+          if(count>=cover.length) chosen=cover.slice();
+          else { var ranked=cover.slice().sort(function(a,b){ var d=dayCapacity(b)-dayCapacity(a); return d!==0?d:(a<b?-1:1); }); // 여유 큰 날 우선
+            chosen=ranked.slice(0,count).sort(function(a,b){return a<b?-1:1;}); }
+        }
         var seen={}; chosen.forEach(function(k){ if(!seen[k]){ seen[k]=1; days.push({key:k,units:[],review:false}); } });
         startKey=days.length?days[0].key:null;
       }
     } else {
       var need=Math.ceil(units.length/upd);
       if(need<=cover.length){
-        // 남은 범위를 준비 기간(≈3주) 전체에 고르게 분산 — 첫 학습일(≈3주 전)부터 시작
+        // 남은 범위를 준비 기간(≈3주)에 분산하되, 금공강·주말 등 여유 큰 날에 더 많이 배분
         var D=cover.length, U=units.length, byDay={};
-        for(var i=0;i<U;i++){ var di=Math.floor(i*D/U); (byDay[di]=byDay[di]||[]).push(units[i]); }
-        Object.keys(byDay).map(Number).sort(function(a,b){return a-b;}).forEach(function(di){
-          days.push({key:cover[di], units:byDay[di], review:false});
-        });
-        startKey=cover[0];
+        var cum=[], run=0; for(var wi=0;wi<D;wi++){ run+=dayCapacity(cover[wi]); cum.push(run); }
+        var totalW=run||D;
+        for(var i=0;i<U;i++){ var target=(i+0.5)/U*totalW, di=0; while(di<D-1 && cum[di]<target) di++; (byDay[di]=byDay[di]||[]).push(units[i]); }
+        var idxs=Object.keys(byDay).map(Number).sort(function(a,b){return a-b;});
+        idxs.forEach(function(di){ days.push({key:cover[di], units:byDay[di], review:false}); });
+        startKey=idxs.length?cover[idxs[0]]:cover[0];
       } else { tight=true; var perDay=Math.ceil(units.length/Math.max(1,cover.length)), idx3=0; startKey=cover.length?cover[0]:null;
         cover.forEach(function(k){ days.push({key:k,units:units.slice(idx3,idx3+perDay),review:false}); idx3+=perDay; }); }
     }
