@@ -398,10 +398,6 @@
         <div class="panel-head"><h2>학교 할 일 (시험·과제)</h2><span class="count" id="schoolTaskCount"></span></div>
         <div class="panel-body"><div class="asn-list" id="schoolTasks"></div></div>
       </section>
-      <section class="panel">
-        <div class="panel-head"><h2>과목별 자료</h2></div>
-        <div class="panel-body" id="materials"></div>
-      </section>
     </div>
   </div>
 
@@ -645,7 +641,37 @@
   }
 
   var PLANS={};
-  function rebuildPlans(tKey){ PLANS={}; var subs=subjects(); Object.keys(subs).forEach(function(id){ PLANS[id]=studyPlan(subs[id],tKey); }); }
+  function rebuildPlans(tKey){ PLANS={}; var subs=subjects(); Object.keys(subs).forEach(function(id){ PLANS[id]=studyPlan(subs[id],tKey); }); balanceSubjectsPerDay(tKey); }
+  // 하루에 공부하는 '과목 수' 상한: 금(5)·토(6)·일(0)=3과목, 그 외 평일=2과목
+  function dailySubjCap(key){ var w=parseKey(key).getDay(); return (w===5||w===6||w===0)?3:2; }
+  // 여러 과목 계획을 합쳐 하루 과목 수가 상한을 넘으면, 초과분을 여유 있는 다음 날로 이동
+  function balanceSubjectsPerDay(tKey){
+    var byDay={};
+    Object.keys(PLANS).forEach(function(id){ (PLANS[id].days||[]).forEach(function(d){ (byDay[d.key]=byDay[d.key]||[]).push({id:id,d:d}); }); });
+    Object.keys(byDay).sort().forEach(function(key){
+      var list=byDay[key]; if(!list) return; var c=dailySubjCap(key); if(list.length<=c) return;
+      // 시험이 임박한 과목을 그 날에 우선 유지, 시험이 먼 과목을 뒤로 이동
+      list.sort(function(a,b){ var ea=(subjects()[a.id]||{}).exam||"~", eb=(subjects()[b.id]||{}).exam||"~"; return ea<eb?-1:ea>eb?1:0; });
+      list.slice(c).forEach(function(item){ var s=subjects()[item.id]||{}, placed=false, nk=key, tries=0;
+        while(tries++<180){ nk=addDays(nk,1);                 // 먼저 여유 있는 '다음' 날로
+          if(s.exam && nk>=s.exam) break;                 // 시험 전날까지만
+          if(isBusyDay(nk)) continue;                     // 시험일·여러 날 일정 제외
+          var occ=byDay[nk]||[];
+          if(occ.length>=dailySubjCap(nk)) continue;      // 그 날도 이미 꽉 참
+          if(occ.some(function(x){return x.id===item.id;})) continue; // 같은 과목 하루 중복 금지
+          item.d.key=nk; (byDay[nk]=byDay[nk]||[]).push(item); placed=true; break;
+        }
+        if(!placed){ var pk=key, tb=0; while(tb++<180){ pk=addDays(pk,-1);   // 없으면 '이전' 빈 날로
+          if(diffDays(tKey,pk)<0) break; if(isBusyDay(pk)) continue;
+          var o2=byDay[pk]||[]; if(o2.length>=dailySubjCap(pk)) continue;
+          if(o2.some(function(x){return x.id===item.id;})) continue;
+          item.d.key=pk; (byDay[pk]=byDay[pk]||[]).push(item); break;
+        } }
+      });
+      byDay[key]=list.slice(0,c);
+    });
+    Object.keys(PLANS).forEach(function(id){ var p=PLANS[id]; p.days.sort(function(a,b){return a.key<b.key?-1:1;}); var fut=p.days.filter(function(d){return !d.review&&d.key>=tKey;}); if(fut.length) p.startKey=fut[0].key; });
+  }
   function studyOnDay(id,key){ var p=PLANS[id]; if(!p) return null; for(var i=0;i<p.days.length;i++) if(p.days[i].key===key) return p.days[i]; return null; }
 
   // 공부 세션 목표(무엇을 할지) — 단계별로 구체화
@@ -790,7 +816,6 @@
     renderSchoolLegend();
     renderAgenda(tKey);
     renderSchoolTasks(tKey);
-    renderMaterials();
     renderCatPane("commsec",tKey); renderCatPane("asc",tKey); renderCatPane("etc",tKey);
     renderAllCalendars();
     fillPomoSubjects();
