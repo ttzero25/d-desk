@@ -320,13 +320,15 @@
   .pw-head .pw-range{font-family:var(--mono);font-size:11.5px;color:var(--muted);}
   .pw-head .pw-goal{flex-basis:100%;font-size:12px;color:var(--ink-2);margin-top:2px;}
   .pw-head .pw-goal .pw-u{color:var(--muted);}
-  .plan-rows{margin-top:6px;padding-left:4px;display:flex;flex-direction:column;gap:5px;}
-  .plan-row{display:grid;grid-template-columns:52px 74px auto 1fr;align-items:center;gap:8px;font-size:12px;}
+  .plan-rows{margin-top:6px;padding-left:4px;display:flex;flex-direction:column;gap:8px;}
+  .plan-row{display:flex;flex-direction:column;gap:2px;}
+  .plan-row .pr-line{display:grid;grid-template-columns:52px 74px auto 1fr;align-items:center;gap:8px;font-size:12px;}
   .plan-row .pr-d{font-family:var(--mono);font-weight:600;color:var(--ink-2);}
   .plan-row .pr-wd{font-family:var(--mono);color:var(--muted);} .plan-row .pr-wd.sun{color:var(--sun);} .plan-row .pr-wd.sat{color:var(--sat);}
   .plan-row .pr-u{color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .plan-row .pr-do{font-size:11px;color:var(--muted);padding-left:60px;line-height:1.4;}
   .plan-row.done{opacity:.5;} .plan-row.done .pr-u{text-decoration:line-through;}
-  @media (max-width:480px){ .plan-row{grid-template-columns:46px 62px auto;} .plan-row .pr-u{grid-column:2 / -1;} }
+  @media (max-width:480px){ .plan-row .pr-line{grid-template-columns:46px 58px auto;} .plan-row .pr-u{grid-column:2 / -1;} .plan-row .pr-do{padding-left:0;} }
   @media (max-width:860px){ .stats{grid-template-columns:repeat(2,1fr);} .home-grid{grid-template-columns:1fr;} }
   @media (max-width:480px){ .wrap{padding:14px 12px 90px;} .nav button{padding:8px 11px;font-size:12.5px;} .cal-cell{min-height:46px;} .day{grid-template-columns:60px 1fr;} .pomo{right:12px;left:12px;width:auto;} }
 </style>
@@ -719,9 +721,17 @@
   }
   function studyOnDay(id,key){ var p=PLANS[id]; if(!p) return null; for(var i=0;i<p.days.length;i++) if(p.days[i].key===key) return p.days[i]; return null; }
 
-  // 공부 세션 목표(무엇을 할지) — 단계별로 구체화
-  var MODE={ concept:{t:"개념 이해",c:"cn"}, practice:{t:"문제 풀이·기출",c:"pr"}, review:{t:"복습·오답 정리",c:"rv"}, final:{t:"최종 점검·전체 훑기",c:"fn"}, study:{t:"공부",c:"st"} };
+  // 공부 세션 목표(무엇을 할지) — 단계별 라벨(t)·색(c)·구체 실행(d)
+  var MODE={
+    concept:{t:"개념 이해",c:"cn",d:"강의·교재로 개념을 이해하고 핵심 내용 정리"},
+    practice:{t:"문제 풀이·기출",c:"pr",d:"기출·연습문제 풀며 적용 연습, 모르는 건 표시"},
+    review:{t:"복습·오답 정리",c:"rv",d:"틀린 문제·약한 부분 위주로 다시 보기"},
+    final:{t:"최종 점검·전체 훑기",c:"fn",d:"전체 요약 훑고 헷갈리는 부분만 최종 확인"},
+    study:{t:"공부",c:"st",d:"학습 세션 진행"}
+  };
   function planMode(d){ if(d&&d.mode&&MODE[d.mode]) return MODE[d.mode]; return d&&d.review?MODE.review:MODE.study; }
+  // 그 날 실제로 뭘 공부할지: "범위 — 실행" 한 줄
+  function planTodo(d){ var m=planMode(d); var tgt=d.units&&d.units.length?scopeStr(d.units):(d.review?"전 범위":""); return (tgt?tgt+" — ":"")+m.d; }
 
   /* ===== 과목별 범위 정리 (단원 체크리스트) ===== */
   // 체크 = 학습 완료(learned) → 계획에서 자동 제외·재분배
@@ -1035,7 +1045,10 @@
           var st=parseKey(wk), en=parseKey(addDays(wk,6));
           var hdr='<div class="pw-head"><span class="pw-n">'+wi+'주차</span><span class="pw-range">'+(st.getMonth()+1)+'/'+st.getDate()+'~'+(en.getMonth()+1)+'/'+en.getDate()+'</span><div class="pw-goal">'+goal+'</div></div>';
           var rowz=dz.map(function(d){ var toEx=diffDays(d.key,s.exam), dk=parseKey(d.key), m=planMode(d), dn2=s.done&&s.done[d.key];
-            return '<div class="plan-row'+(dn2?" done":"")+'"><span class="pr-d">'+(toEx===0?"D-DAY":ddayLabel(toEx))+'</span><span class="pr-wd '+(dk.getDay()===0?"sun":dk.getDay()===6?"sat":"")+'">'+(dk.getMonth()+1)+'/'+dk.getDate()+'('+WD[dk.getDay()]+')</span><span class="badge2 '+m.c+'">'+m.t+'</span><span class="pr-u">'+(d.units.length?esc(scopeStr(d.units)):(d.review?"전 범위":"—"))+'</span></div>';
+            return '<div class="plan-row'+(dn2?" done":"")+'">'+
+              '<div class="pr-line"><span class="pr-d">'+(toEx===0?"D-DAY":ddayLabel(toEx))+'</span><span class="pr-wd '+(dk.getDay()===0?"sun":dk.getDay()===6?"sat":"")+'">'+(dk.getMonth()+1)+'/'+dk.getDate()+'('+WD[dk.getDay()]+')</span><span class="badge2 '+m.c+'">'+m.t+'</span><span class="pr-u">'+(d.units.length?esc(scopeStr(d.units)):(d.review?"전 범위":"—"))+'</span></div>'+
+              '<div class="pr-do">'+esc(m.d)+'</div>'+
+            '</div>';
           }).join("");
           return '<div class="pw-grp">'+hdr+'<div class="plan-rows">'+rowz+'</div></div>';
         }).join("");
@@ -1180,7 +1193,7 @@
     it.dues.forEach(function(d){ var t=d.t, c=CAT[t.cat]||CAT.etc, done=occDone(t,d.occ), st=shortStatus(d.start,d.end,done,tKey), dt=(d.start!==d.end)?(fmtDate(d.start)+" ~ "+fmtDate(d.end)):fmtDate(d.end), examB=(t.type==="exam")?EXAMCHIP:'', tl=timeLabel(t), repB=t.repeat?'<span class="cat-chip" style="background:var(--surface-2);color:var(--muted)"><span class="cdot" style="background:var(--muted)"></span>'+REPEAT[t.repeat]+'</span>':'';
       rows+='<div class="dm-row '+(done?"done":"")+'" data-action="edit-task" data-id="'+t.id+'"><button class="dm-check" data-action="toggle-task" data-id="'+t.id+'" data-occ="'+d.occ+'" aria-label="완료">'+CHECK+'</button><div class="dm-main"><div class="dm-t">'+(tl?esc(tl)+' ':'')+esc(t.title)+'</div><div class="dm-sub">'+examB+'<span class="cat-chip" style="background:'+c.color+'22;color:'+c.color+'"><span class="cdot" style="background:'+c.color+'"></span>'+c.label+'</span>'+repB+'<span class="dm">'+dt+' · '+st.t+'</span></div>'+(t.note?'<div class="dm-note">'+esc(t.note)+'</div>':'')+'</div><div class="dm-acts"><button data-action="edit-task" data-id="'+t.id+'" aria-label="편집">'+PEN+'</button><button class="del" data-action="del-task" data-id="'+t.id+'" aria-label="삭제">'+X+'</button></div></div>'; });
     it.study.forEach(function(o){ var done=o.s.done&&o.s.done[key], md=planMode(o.plan);
-      rows+='<div class="dm-row '+(done?"done":"")+'" data-action="edit-subject" data-id="'+o.s.id+'"><button class="dm-check" data-action="toggle-study" data-id="'+o.s.id+'" data-key="'+key+'" aria-label="완료">'+CHECK+'</button><div class="dm-main"><div class="dm-t">'+esc(calSubjName(o.s.name))+'</div><div class="dm-sub"><span class="badge2 '+md.c+'">'+md.t+'</span>'+(o.plan.units.length?'<span class="scope">'+esc(scopeStr(o.plan.units))+'</span>':'<span class="dm">전 범위 대상</span>')+'</div></div><div class="dm-acts"><button data-action="edit-subject" data-id="'+o.s.id+'" aria-label="편집">'+PEN+'</button></div></div>'; });
+      rows+='<div class="dm-row '+(done?"done":"")+'" data-action="edit-subject" data-id="'+o.s.id+'"><button class="dm-check" data-action="toggle-study" data-id="'+o.s.id+'" data-key="'+key+'" aria-label="완료">'+CHECK+'</button><div class="dm-main"><div class="dm-t">'+esc(calSubjName(o.s.name))+'</div><div class="dm-sub"><span class="badge2 '+md.c+'">'+md.t+'</span>'+(o.plan.units.length?'<span class="scope">'+esc(scopeStr(o.plan.units))+'</span>':'<span class="dm">전 범위 대상</span>')+'</div><div class="dm-note">'+esc(md.d)+'</div></div><div class="dm-acts"><button data-action="edit-subject" data-id="'+o.s.id+'" aria-label="편집">'+PEN+'</button></div></div>'; });
     var addCat=filter||"school", holM=holidayName(key);
     modal.innerHTML='<div class="modal-head"><h3>'+(d.getMonth()+1)+'월 '+d.getDate()+'일 ('+WD[d.getDay()]+')'+(holM?' <span style="color:var(--sun);font-size:12px;font-weight:600">'+esc(holM)+'</span>':'')+' <span style="font-family:var(--mono);font-size:12px;color:var(--accent);font-weight:600;margin-left:6px">'+rel+'</span></h3><button class="btn icon ghost" data-close>'+X+'</button></div>'+
       '<div class="modal-body"><div class="dm-list">'+rows+'</div><button class="btn dm-add" data-action="add-task" data-cat="'+addCat+'" data-due="'+key+'"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>이 날 일정 추가</button></div>';
