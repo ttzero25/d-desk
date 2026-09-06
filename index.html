@@ -469,11 +469,11 @@
   function loadTimetable(){ try{ var r=localStorage.getItem(TT_KEY); if(r){ var o=JSON.parse(r),tt={}; for(var i=0;i<7;i++) tt[i]=Math.max(0,+o[i]||0); return tt; } }catch(e){} return Object.assign({},TT_DEFAULT); }
   var TIMETABLE=loadTimetable();
   function saveTimetable(tt){ TIMETABLE=tt; try{ localStorage.setItem(TT_KEY,JSON.stringify(tt)); }catch(e){} }
-  // 전 과목 공통 '학습 시작일' — 설정 시 이 날짜부터(3주 제한 무시) 모든 과목 계획 시작
-  var SS_KEY="dd_study_start";
-  function loadStudyStart(){ try{ return localStorage.getItem(SS_KEY)||""; }catch(e){ return ""; } }
+  // 전 과목 공통 '학습 시작일' — 이 날짜부터(한 달 제한 무시) 모든 과목 계획 시작. 기본 9/21, 설정에서 변경 가능
+  var SS_KEY="dd_study_start", SS_DEFAULT="2026-09-21";
+  function loadStudyStart(){ try{ var v=localStorage.getItem(SS_KEY); return v==null?SS_DEFAULT:v; }catch(e){ return SS_DEFAULT; } }
   var STUDY_START=loadStudyStart();
-  function saveStudyStart(v){ STUDY_START=v||""; try{ if(v) localStorage.setItem(SS_KEY,v); else localStorage.removeItem(SS_KEY); }catch(e){} }
+  function saveStudyStart(v){ STUDY_START=(v==null?"":v); try{ if(v) localStorage.setItem(SS_KEY,v); else localStorage.setItem(SS_KEY,""); }catch(e){} }
   // 하루 학습 배분 가중치: 여유 클수록↑ (공휴일·금공강·주말=3, 1과목=2, 2과목=1.4, 3과목↑=1)
   //  + 사용자가 추가한 그 날 일정(이벤트)만큼 여유를 깎아 계획이 자동으로 그 날을 덜/안 잡게 함
   function dayCapacity(key){
