@@ -308,6 +308,19 @@
   .scope-chip:hover{border-color:var(--sc,var(--accent));}
   .scope-chip svg{width:11px;height:11px;}
   .scope-chip.done{background:var(--sc,var(--accent));border-color:var(--sc,var(--accent));color:#fff;}
+  /* 과목 카드 안 주차별 계획표 */
+  .plan-box{margin-top:11px;border-top:1px solid var(--line);padding-top:9px;}
+  .plan-box summary{cursor:pointer;font-size:12.5px;font-weight:600;color:var(--accent-ink);list-style:none;display:flex;align-items:center;gap:5px;}
+  .plan-box summary::-webkit-details-marker{display:none;}
+  .plan-box summary::before{content:"▸";transition:.15s;color:var(--muted);}
+  .plan-box[open] summary::before{transform:rotate(90deg);}
+  .plan-rows{margin-top:8px;display:flex;flex-direction:column;gap:5px;}
+  .plan-row{display:grid;grid-template-columns:52px 74px auto 1fr;align-items:center;gap:8px;font-size:12px;}
+  .plan-row .pr-d{font-family:var(--mono);font-weight:600;color:var(--ink-2);}
+  .plan-row .pr-wd{font-family:var(--mono);color:var(--muted);} .plan-row .pr-wd.sun{color:var(--sun);} .plan-row .pr-wd.sat{color:var(--sat);}
+  .plan-row .pr-u{color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .plan-row.done{opacity:.5;} .plan-row.done .pr-u{text-decoration:line-through;}
+  @media (max-width:480px){ .plan-row{grid-template-columns:46px 62px auto;} .plan-row .pr-u{grid-column:2 / -1;} }
   @media (max-width:860px){ .stats{grid-template-columns:repeat(2,1fr);} .home-grid{grid-template-columns:1fr;} }
   @media (max-width:480px){ .wrap{padding:14px 12px 90px;} .nav button{padding:8px 11px;font-size:12.5px;} .cal-cell{min-height:46px;} .day{grid-template-columns:60px 1fr;} .pomo{right:12px;left:12px;width:auto;} }
 </style>
@@ -626,7 +639,9 @@
         var D=cover.length, U=units.length, byDay={};
         var cum=[], run=0; for(var wi=0;wi<D;wi++){ run+=dayCapacity(cover[wi]); cum.push(run); }
         var totalW=run||D;
-        for(var i=0;i<U;i++){ var target=(i+0.5)/U*totalW, di=0; while(di<D-1 && cum[di]<target) di++; (byDay[di]=byDay[di]||[]).push(units[i]); }
+        for(var i=0;i<U;i++){ var di; if(i===0){ di=0; }   // 첫 단원은 반드시 첫 학습일(≈D-21)에 → 모든 과목 3주 전 시작
+          else { var target=(i+0.5)/U*totalW; di=0; while(di<D-1 && cum[di]<target) di++; }
+          (byDay[di]=byDay[di]||[]).push(units[i]); }
         var idxs=Object.keys(byDay).map(Number).sort(function(a,b){return a-b;});
         idxs.forEach(function(di){ days.push({key:cover[di], units:byDay[di], review:false, mode:"concept"}); });
         startKey=idxs.length?cover[idxs[0]]:cover[0];
@@ -644,30 +659,43 @@
   function rebuildPlans(tKey){ PLANS={}; var subs=subjects(); Object.keys(subs).forEach(function(id){ PLANS[id]=studyPlan(subs[id],tKey); }); balanceSubjectsPerDay(tKey); }
   // 하루에 공부하는 '과목 수' 상한: 금(5)·토(6)·일(0)=3과목, 그 외 평일=2과목
   function dailySubjCap(key){ var w=parseKey(key).getDay(); return (w===5||w===6||w===0)?3:2; }
-  // 여러 과목 계획을 합쳐 하루 과목 수가 상한을 넘으면, 초과분을 여유 있는 다음 날로 이동
+  // 여러 과목 계획을 합쳐: (1) 시험 전날은 그 과목만, (2) 하루 과목 수 상한 → 초과분 이동
   function balanceSubjectsPerDay(tKey){
+    var subs=subjects();
     var byDay={};
     Object.keys(PLANS).forEach(function(id){ (PLANS[id].days||[]).forEach(function(d){ (byDay[d.key]=byDay[d.key]||[]).push({id:id,d:d}); }); });
+    // 시험 전날(전날 소유 과목) 표: 그 날은 해당 과목 전용
+    var eveOwner={}; Object.keys(subs).forEach(function(id){ if(subs[id].exam) eveOwner[addDays(subs[id].exam,-1)]=id; });
+    // 세션을 여유 있는 다른 날로 이동(다음날 우선, 없으면 이전날). 다른 과목의 시험 전날은 피함.
+    function relocate(item, fromKey){
+      var s=subs[item.id]||{}, nk=fromKey, t1=0;
+      while(t1++<200){ nk=addDays(nk,1);
+        if(s.exam && nk>=s.exam) break; if(isBusyDay(nk)) continue;
+        if(eveOwner[nk] && eveOwner[nk]!==item.id) continue;
+        var occ=byDay[nk]||[]; if(occ.length>=dailySubjCap(nk)) continue;
+        if(occ.some(function(x){return x.id===item.id;})) continue;
+        item.d.key=nk; (byDay[nk]=byDay[nk]||[]).push(item); return true;
+      }
+      var pk=fromKey, t2=0;
+      while(t2++<200){ pk=addDays(pk,-1);
+        if(diffDays(tKey,pk)<0) break; if(isBusyDay(pk)) continue;
+        if(eveOwner[pk] && eveOwner[pk]!==item.id) continue;
+        var o2=byDay[pk]||[]; if(o2.length>=dailySubjCap(pk)) continue;
+        if(o2.some(function(x){return x.id===item.id;})) continue;
+        item.d.key=pk; (byDay[pk]=byDay[pk]||[]).push(item); return true;
+      }
+      return false;
+    }
+    // (1) 시험 전날: 소유 과목 외 나머지는 다른 날로 이동
+    Object.keys(eveOwner).forEach(function(eve){ var list=byDay[eve]; if(!list) return; var own=eveOwner[eve], keep=[];
+      list.forEach(function(item){ if(item.id===own) keep.push(item); else if(!relocate(item,eve)) keep.push(item); });
+      byDay[eve]=keep;
+    });
+    // (2) 하루 과목 수 상한
     Object.keys(byDay).sort().forEach(function(key){
       var list=byDay[key]; if(!list) return; var c=dailySubjCap(key); if(list.length<=c) return;
-      // 시험이 임박한 과목을 그 날에 우선 유지, 시험이 먼 과목을 뒤로 이동
-      list.sort(function(a,b){ var ea=(subjects()[a.id]||{}).exam||"~", eb=(subjects()[b.id]||{}).exam||"~"; return ea<eb?-1:ea>eb?1:0; });
-      list.slice(c).forEach(function(item){ var s=subjects()[item.id]||{}, placed=false, nk=key, tries=0;
-        while(tries++<180){ nk=addDays(nk,1);                 // 먼저 여유 있는 '다음' 날로
-          if(s.exam && nk>=s.exam) break;                 // 시험 전날까지만
-          if(isBusyDay(nk)) continue;                     // 시험일·여러 날 일정 제외
-          var occ=byDay[nk]||[];
-          if(occ.length>=dailySubjCap(nk)) continue;      // 그 날도 이미 꽉 참
-          if(occ.some(function(x){return x.id===item.id;})) continue; // 같은 과목 하루 중복 금지
-          item.d.key=nk; (byDay[nk]=byDay[nk]||[]).push(item); placed=true; break;
-        }
-        if(!placed){ var pk=key, tb=0; while(tb++<180){ pk=addDays(pk,-1);   // 없으면 '이전' 빈 날로
-          if(diffDays(tKey,pk)<0) break; if(isBusyDay(pk)) continue;
-          var o2=byDay[pk]||[]; if(o2.length>=dailySubjCap(pk)) continue;
-          if(o2.some(function(x){return x.id===item.id;})) continue;
-          item.d.key=pk; (byDay[pk]=byDay[pk]||[]).push(item); break;
-        } }
-      });
+      list.sort(function(a,b){ var ea=(subs[a.id]||{}).exam||"~", eb=(subs[b.id]||{}).exam||"~"; return ea<eb?-1:ea>eb?1:0; }); // 임박 과목 유지
+      list.slice(c).forEach(function(item){ relocate(item,key); });
       byDay[key]=list.slice(0,c);
     });
     Object.keys(PLANS).forEach(function(id){ var p=PLANS[id]; p.days.sort(function(a,b){return a.key<b.key?-1:1;}); var fut=p.days.filter(function(d){return !d.review&&d.key>=tKey;}); if(fut.length) p.startKey=fut[0].key; });
@@ -975,9 +1003,17 @@
         if(p.learnedCount>0 && p.remaining>0) tip+='<div class="plan-tip '+(p.catchup?"tight":"ok")+'"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 12a9 9 0 1 0 9-9 9 9 0 0 0-6.4 2.6L3 8"/><path d="M3 3v5h5"/></svg>완료 '+p.learnedCount+'개 · 남은 '+p.remaining+'개를 앞으로 재분배'+(p.catchup?' (밀림 — 하루 배분 늘림)':'')+'</div>';
         else if(p.remaining===0 && p.units.length>0) tip='<div class="plan-tip ok"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg>범위 완료! 남은 기간은 복습으로 배치했어요</div>';
       }
+      var planBox="";
+      if(n>=0 && p.days.length){
+        var prows=p.days.map(function(d){ var toEx=diffDays(d.key,s.exam), dk=parseKey(d.key), m=planMode(d), dn2=s.done&&s.done[d.key];
+          return '<div class="plan-row'+(dn2?" done":"")+'"><span class="pr-d">'+(toEx===0?"D-DAY":ddayLabel(toEx))+'</span><span class="pr-wd '+(dk.getDay()===0?"sun":dk.getDay()===6?"sat":"")+'">'+(dk.getMonth()+1)+'/'+dk.getDate()+'('+WD[dk.getDay()]+')</span><span class="badge2 '+m.c+'">'+m.t+'</span><span class="pr-u">'+(d.units.length?esc(scopeStr(d.units)):(d.review?"전 범위":"—"))+'</span></div>';
+        }).join("");
+        planBox='<details class="plan-box"><summary>주차별 계획표 · '+p.days.length+'일</summary><div class="plan-rows">'+prows+'</div></details>';
+      }
       return '<div class="subj" style="--sc:'+col+'"><div class="subj-top"><div><div class="subj-name">'+esc(s.name)+'</div><div class="subj-meta">'+fmtDate(s.exam)+' ('+WD[parseKey(s.exam).getDay()]+') · '+(WORKLOAD[s.workload]||WORKLOAD[2]).label+(p.units.length?' · 범위 '+p.units.length+'개':' · 범위 미입력')+'</div></div><span class="dday '+ddayClass(n)+'">'+ddayLabel(n)+'</span></div>'+
         tip+
         (n>=0?'<div class="progress"><div class="bar"><i style="width:'+pct+'%"></i></div><div class="ptxt"><span>학습 진도</span><span>'+done+' / '+total+' '+progLabel+'</span></div></div>':'')+
+        planBox+
         (mats?'<div class="mats">'+mats+'</div>':'')+actions+'</div>';
     }).join("");
   }
