@@ -874,9 +874,9 @@
     openScrim("f-name");
   }
 
-  function openTaskModal(t, presetCat, presetDue){
+  function openTaskModal(t, presetCat, presetDate){
     dayModalKey=null;
-    var edit=!!t; t=t||{title:"",cat:presetCat||"school",subjectId:"",due:presetDue||"",done:false};
+    var edit=!!t; t=t||{title:"",cat:presetCat||"school",subjectId:"",start:presetDate||"",due:"",done:false};
     var subs=subjects();
     var catOpts=CATS.map(function(c){return '<option value="'+c+'" '+(t.cat===c?"selected":"")+'>'+CAT[c].label+' ('+c+')</option>';}).join("");
     var subjOpts='<option value="">과목 연결 안 함</option>'+Object.keys(subs).map(function(id){return '<option value="'+id+'" '+(t.subjectId===id?"selected":"")+'>'+esc(subs[id].name)+'</option>';}).join("");
