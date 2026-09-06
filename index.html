@@ -314,7 +314,13 @@
   .plan-box summary::-webkit-details-marker{display:none;}
   .plan-box summary::before{content:"▸";transition:.15s;color:var(--muted);}
   .plan-box[open] summary::before{transform:rotate(90deg);}
-  .plan-rows{margin-top:8px;display:flex;flex-direction:column;gap:5px;}
+  .pw-grp{margin-top:10px;}
+  .pw-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 8px;background:var(--surface-2);border-radius:8px;}
+  .pw-head .pw-n{font-weight:700;font-size:12.5px;color:var(--sc,var(--accent-ink));}
+  .pw-head .pw-range{font-family:var(--mono);font-size:11.5px;color:var(--muted);}
+  .pw-head .pw-goal{flex-basis:100%;font-size:12px;color:var(--ink-2);margin-top:2px;}
+  .pw-head .pw-goal .pw-u{color:var(--muted);}
+  .plan-rows{margin-top:6px;padding-left:4px;display:flex;flex-direction:column;gap:5px;}
   .plan-row{display:grid;grid-template-columns:52px 74px auto 1fr;align-items:center;gap:8px;font-size:12px;}
   .plan-row .pr-d{font-family:var(--mono);font-weight:600;color:var(--ink-2);}
   .plan-row .pr-wd{font-family:var(--mono);color:var(--muted);} .plan-row .pr-wd.sun{color:var(--sun);} .plan-row .pr-wd.sat{color:var(--sat);}
@@ -340,7 +346,7 @@
         <button class="btn icon ghost" id="notifBtn" title="학습 알림 켜기" aria-label="학습 알림">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
         </button>
-        <button class="btn icon ghost" id="ttBtn" title="시간표 편집 (요일별 수업 수)" aria-label="시간표 편집">
+        <button class="btn icon ghost" id="ttBtn" title="설정 (시간표·학습 시작일)" aria-label="설정">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 10h18M9 4v18M15 4v18"/></svg>
         </button>
         <button class="btn" data-action="add-task"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>일정</button>
@@ -461,6 +467,11 @@
   function loadTimetable(){ try{ var r=localStorage.getItem(TT_KEY); if(r){ var o=JSON.parse(r),tt={}; for(var i=0;i<7;i++) tt[i]=Math.max(0,+o[i]||0); return tt; } }catch(e){} return Object.assign({},TT_DEFAULT); }
   var TIMETABLE=loadTimetable();
   function saveTimetable(tt){ TIMETABLE=tt; try{ localStorage.setItem(TT_KEY,JSON.stringify(tt)); }catch(e){} }
+  // 전 과목 공통 '학습 시작일' — 설정 시 이 날짜부터(3주 제한 무시) 모든 과목 계획 시작
+  var SS_KEY="dd_study_start";
+  function loadStudyStart(){ try{ return localStorage.getItem(SS_KEY)||""; }catch(e){ return ""; } }
+  var STUDY_START=loadStudyStart();
+  function saveStudyStart(v){ STUDY_START=v||""; try{ if(v) localStorage.setItem(SS_KEY,v); else localStorage.removeItem(SS_KEY); }catch(e){} }
   // 하루 학습 배분 가중치: 여유 클수록↑ (공휴일·금공강·주말=3, 1과목=2, 2과목=1.4, 3과목↑=1)
   //  + 사용자가 추가한 그 날 일정(이벤트)만큼 여유를 깎아 계획이 자동으로 그 날을 덜/안 잡게 함
   function dayCapacity(key){
@@ -597,18 +608,22 @@
     if (!s.exam) return done({noExam:true});     // 시험일 미정: 계획 보류
     if (toExam<0) return done({});
     if (toExam===0) return done({days:[{key:tKey,units:units.length?units.slice():allUnits.slice(),review:true}],startKey:tKey,tight:units.length>0});
-    // 오늘~시험 전날 중, 시험일·여러 날 일정만 제외한 '학습 가능일' (공휴일은 포함해 여유일로 활용)
-    var all=[]; for(var o=0;o<toExam;o++) all.push(addDays(tKey,o));
+    // 학습 시작 기준일: 전역 '학습 시작일'이 있으면 그 날부터, 없으면 오늘부터
+    var hasFixedStart = STUDY_START && STUDY_START>tKey && STUDY_START<s.exam;
+    var anchor = hasFixedStart ? STUDY_START : tKey;
+    var startOff = diffDays(tKey, anchor);
+    var all=[]; for(var o=startOff;o<toExam;o++) all.push(addDays(tKey,o));
     var usable=all.filter(function(k){ return !isBusyDay(k); });
     var avoided = usable.length<all.length;
     if(usable.length<2){ usable=all.slice(); avoided=false; }        // 여유 없으면 전부 사용
-    // 시험 3주(21일) 전부터 준비: 학습 가능일을 시험 21일 이내로 제한(그 안에 다 못 들어가면 더 일찍 시작)
-    var PREP_DAYS=21;
-    var windowUsable=usable.filter(function(k){ return diffDays(k, s.exam)<=PREP_DAYS; });
-    if(windowUsable.length>=2){
-      var needRaw=units.length?Math.ceil(units.length/upd):0;
-      // 3주 안에 범위가 안 들어가는 무거운 과목만 창을 넘겨 더 일찍 시작
-      if(needRaw<=windowUsable.length) usable=windowUsable;
+    if(!hasFixedStart){
+      // (시작일 미설정 시) 시험 3주(21일) 전부터 준비: 학습 가능일을 시험 21일 이내로 제한
+      var PREP_DAYS=21;
+      var windowUsable=usable.filter(function(k){ return diffDays(k, s.exam)<=PREP_DAYS; });
+      if(windowUsable.length>=2){
+        var needRaw=units.length?Math.ceil(units.length/upd):0;
+        if(needRaw<=windowUsable.length) usable=windowUsable;
+      }
     }
     // 복습 주기(간격 반복): 시험 직전 하루가 아니라 여러 날에 걸쳐, 단계별 목표로 배치
     var reviewKeys=[], reviewMode={};
@@ -1005,10 +1020,24 @@
       }
       var planBox="";
       if(n>=0 && p.days.length){
-        var prows=p.days.map(function(d){ var toEx=diffDays(d.key,s.exam), dk=parseKey(d.key), m=planMode(d), dn2=s.done&&s.done[d.key];
-          return '<div class="plan-row'+(dn2?" done":"")+'"><span class="pr-d">'+(toEx===0?"D-DAY":ddayLabel(toEx))+'</span><span class="pr-wd '+(dk.getDay()===0?"sun":dk.getDay()===6?"sat":"")+'">'+(dk.getMonth()+1)+'/'+dk.getDate()+'('+WD[dk.getDay()]+')</span><span class="badge2 '+m.c+'">'+m.t+'</span><span class="pr-u">'+(d.units.length?esc(scopeStr(d.units)):(d.review?"전 범위":"—"))+'</span></div>';
+        var monOf=function(k){ var w=(parseKey(k).getDay()+6)%7; return addDays(k,-w); };
+        var byW={}, worder=[];
+        p.days.forEach(function(d){ var wk=monOf(d.key); if(!byW[wk]){byW[wk]=[];worder.push(wk);} byW[wk].push(d); });
+        worder.sort();
+        var wi=0;
+        var wsec=worder.map(function(wk){ wi++; var dz=byW[wk];
+          // 주차별 목표: 그 주에 등장하는 단계 + 학습 단원 요약
+          var ph=[], seenP={}, us=[];
+          dz.forEach(function(d){ var m=planMode(d); if(!seenP[m.t]){seenP[m.t]=1;ph.push(m.t);} d.units.forEach(function(u){us.push(u);}); });
+          var goal=esc(ph.join(" · "))+(us.length?' <span class="pw-u">— '+esc(us.join(", "))+'</span>':'');
+          var st=parseKey(wk), en=parseKey(addDays(wk,6));
+          var hdr='<div class="pw-head"><span class="pw-n">'+wi+'주차</span><span class="pw-range">'+(st.getMonth()+1)+'/'+st.getDate()+'~'+(en.getMonth()+1)+'/'+en.getDate()+'</span><div class="pw-goal">'+goal+'</div></div>';
+          var rowz=dz.map(function(d){ var toEx=diffDays(d.key,s.exam), dk=parseKey(d.key), m=planMode(d), dn2=s.done&&s.done[d.key];
+            return '<div class="plan-row'+(dn2?" done":"")+'"><span class="pr-d">'+(toEx===0?"D-DAY":ddayLabel(toEx))+'</span><span class="pr-wd '+(dk.getDay()===0?"sun":dk.getDay()===6?"sat":"")+'">'+(dk.getMonth()+1)+'/'+dk.getDate()+'('+WD[dk.getDay()]+')</span><span class="badge2 '+m.c+'">'+m.t+'</span><span class="pr-u">'+(d.units.length?esc(scopeStr(d.units)):(d.review?"전 범위":"—"))+'</span></div>';
+          }).join("");
+          return '<div class="pw-grp">'+hdr+'<div class="plan-rows">'+rowz+'</div></div>';
         }).join("");
-        planBox='<details class="plan-box"><summary>주차별 계획표 · '+p.days.length+'일</summary><div class="plan-rows">'+prows+'</div></details>';
+        planBox='<details class="plan-box"><summary>주차별 계획표 · '+p.days.length+'일</summary>'+wsec+'</details>';
       }
       return '<div class="subj" style="--sc:'+col+'"><div class="subj-top"><div><div class="subj-name">'+esc(s.name)+'</div><div class="subj-meta">'+fmtDate(s.exam)+' ('+WD[parseKey(s.exam).getDay()]+') · '+(WORKLOAD[s.workload]||WORKLOAD[2]).label+(p.units.length?' · 범위 '+p.units.length+'개':' · 범위 미입력')+'</div></div><span class="dday '+ddayClass(n)+'">'+ddayLabel(n)+'</span></div>'+
         tip+
@@ -1135,7 +1164,7 @@
 
   /* ===== 날짜 상세 팝업 (모든 캘린더 공용) ===== */
   function tabFilter(){ return activeTab==="home"?null:activeTab; }
-  function dayItems(key,filter,tKey){ var s=daySlot(key,tKey); var showExam=(filter===null||filter==="school"), showStudy=(filter==="school");
+  function dayItems(key,filter,tKey){ var s=daySlot(key,tKey); var showExam=(filter===null||filter==="school"), showStudy=(filter===null||filter==="school");
     return { exams:showExam?s.exams:[], study:showStudy?s.study:[], dues:s.dues.filter(function(d){return filter===null||((d.t.cat||"etc")===filter);}) }; }
   function dayItemCount(it){ return it.exams.length+it.dues.length+it.study.length; }
   function openDayModal(key){
@@ -1185,8 +1214,10 @@
         '<button class="tt-step" data-ttw="'+w+'" data-d="1">+</button>'+
         '<span class="tt-cap" id="ttc-'+w+'">'+capLabel(draft[w])+'</span></div>';
     }).join(""); }
-    modal.innerHTML='<div class="modal-head"><h3>시간표 · 요일별 수업 수</h3><button class="btn icon ghost" data-close>'+X+'</button></div>'+
-      '<div class="modal-body"><div class="tt-hint">수업이 적은 요일(공강·주말)일수록 시험공부를 더 많이 배분해요. 요일별 수업 수를 조절하세요.</div>'+
+    modal.innerHTML='<div class="modal-head"><h3>설정 · 시간표 / 학습 시작일</h3><button class="btn icon ghost" data-close>'+X+'</button></div>'+
+      '<div class="modal-body">'+
+      '<div class="field"><label>전 과목 공부 시작일 <span class="hint">비우면 시험 3주 전 자동 시작</span></label><input id="ss-date" type="date" value="'+esc(STUDY_START||"")+'"></div>'+
+      '<div class="tt-hint" style="margin-top:14px">수업이 적은 요일(공강·주말)일수록 시험공부를 더 많이 배분해요. 요일별 수업 수를 조절하세요.</div>'+
       '<div class="tt-list">'+rows()+'</div></div>'+
       '<div class="modal-foot"><button class="btn ghost" data-close>취소</button><button class="btn primary" id="ttSave">저장</button></div>';
     modal.querySelectorAll("[data-close]").forEach(function(b){ b.addEventListener("click",closeModal); });
@@ -1195,7 +1226,7 @@
       draft[w]=Math.max(0,Math.min(8,draft[w]+d));
       $("ttv-"+w).textContent=draft[w]; $("ttc-"+w).textContent=capLabel(draft[w]);
     }); });
-    $("ttSave").addEventListener("click",function(){ saveTimetable(Object.assign({},draft)); closeModal(); render(); });
+    $("ttSave").addEventListener("click",function(){ saveTimetable(Object.assign({},draft)); saveStudyStart($("ss-date").value); closeModal(); render(); });
     scrim.classList.add("open");
   }
 
