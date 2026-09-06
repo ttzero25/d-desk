@@ -476,9 +476,10 @@
   //  + 사용자가 추가한 그 날 일정(이벤트)만큼 여유를 깎아 계획이 자동으로 그 날을 덜/안 잡게 함
   function dayCapacity(key){
     var cap;
-    if(holidayName(key)) cap=3;                 // 공휴일: 수업 없음 → 추석·설 등은 시험공부 황금기간
-    else { var c=TIMETABLE[parseKey(key).getDay()]; if(c==null)c=1; cap=c<=0?3:c===1?2:c===2?1.4:1; }
-    cap -= eventsOnDay(key)*1.0;                 // 그 날 단일 일정 하나당 여유 1 감소
+    // 여유일(공휴일/공강/주말)에 더 배분하되, 평일도 충분히 쓰이도록 격차는 완만하게(≈1.9x)
+    if(holidayName(key)) cap=1.9;               // 공휴일: 수업 없음 → 추석·설 등은 시험공부 황금기간
+    else { var c=TIMETABLE[parseKey(key).getDay()]; if(c==null)c=1; cap=c<=0?1.9:c===1?1.5:c===2?1.2:1; }
+    cap -= eventsOnDay(key)*0.6;                 // 그 날 단일 일정만큼 여유 감소
     return cap<0.3?0.3:cap;
   }
   var CATS=["school","commsec","asc","etc"];
@@ -608,17 +609,18 @@
     if (!s.exam) return done({noExam:true});     // 시험일 미정: 계획 보류
     if (toExam<0) return done({});
     if (toExam===0) return done({days:[{key:tKey,units:units.length?units.slice():allUnits.slice(),review:true}],startKey:tKey,tight:units.length>0});
-    // 학습 시작 기준일: 전역 '학습 시작일'이 있으면 그 날부터, 없으면 오늘부터
-    var hasFixedStart = STUDY_START && STUDY_START>tKey && STUDY_START<s.exam;
-    var anchor = hasFixedStart ? STUDY_START : tKey;
+    // 학습 시작 기준일 우선순위: 과목별 준비기간(prep주) > 전역 학습시작일 > 기본(시험 3주 전)
+    var prepWeeks=+s.prep||0, hasFixedStart=false, anchor=tKey;
+    if(prepWeeks>0){ var ls=addDays(s.exam,-prepWeeks*7); anchor=(ls>tKey)?ls:tKey; hasFixedStart=true; }
+    else if(STUDY_START && STUDY_START>tKey && STUDY_START<s.exam){ anchor=STUDY_START; hasFixedStart=true; }
     var startOff = diffDays(tKey, anchor);
     var all=[]; for(var o=startOff;o<toExam;o++) all.push(addDays(tKey,o));
     var usable=all.filter(function(k){ return !isBusyDay(k); });
     var avoided = usable.length<all.length;
     if(usable.length<2){ usable=all.slice(); avoided=false; }        // 여유 없으면 전부 사용
     if(!hasFixedStart){
-      // (시작일 미설정 시) 시험 3주(21일) 전부터 준비: 학습 가능일을 시험 21일 이내로 제한
-      var PREP_DAYS=21;
+      // (시작일 미설정 시) 기본: 시험 약 한 달(30일) 전부터 준비 — 학습 가능일을 시험 30일 이내로 제한
+      var PREP_DAYS=30;
       var windowUsable=usable.filter(function(k){ return diffDays(k, s.exam)<=PREP_DAYS; });
       if(windowUsable.length>=2){
         var needRaw=units.length?Math.ceil(units.length/upd):0;
@@ -1187,9 +1189,9 @@
   }
   function refreshDayModal(){ if(dayModalKey==null) return; var k=dayModalKey; if(dayItemCount(dayItems(k,tabFilter(),todayKey()))===0){ closeModal(); return; } openDayModal(k); }
 
-  function planSummary(exam, workload, scope){
+  function planSummary(exam, workload, scope, prep){
     if(!exam) return "시험 날짜를 입력하면 추천 시작일과 하루 공부량을 계산해 드려요.";
-    var tmp={exam:exam,workload:workload,scope:scope}; var p=studyPlan(tmp, todayKey());
+    var tmp={exam:exam,workload:workload,scope:scope,prep:prep||0}; var p=studyPlan(tmp, todayKey());
     var n=diffDays(todayKey(),exam);
     if(n<0) return '<span class="warn">이미 지난 날짜예요.</span>';
     if(n===0) return '<b>D-DAY</b> — 오늘이 시험! 전체 훑어보기 복습을 추천해요.';
@@ -1216,7 +1218,7 @@
     }).join(""); }
     modal.innerHTML='<div class="modal-head"><h3>설정 · 시간표 / 학습 시작일</h3><button class="btn icon ghost" data-close>'+X+'</button></div>'+
       '<div class="modal-body">'+
-      '<div class="field"><label>전 과목 공부 시작일 <span class="hint">비우면 시험 3주 전 자동 시작</span></label><input id="ss-date" type="date" value="'+esc(STUDY_START||"")+'"></div>'+
+      '<div class="field"><label>전 과목 공부 시작일 <span class="hint">비우면 시험 약 한 달 전 자동 시작</span></label><input id="ss-date" type="date" value="'+esc(STUDY_START||"")+'"></div>'+
       '<div class="tt-hint" style="margin-top:14px">수업이 적은 요일(공강·주말)일수록 시험공부를 더 많이 배분해요. 요일별 수업 수를 조절하세요.</div>'+
       '<div class="tt-list">'+rows()+'</div></div>'+
       '<div class="modal-foot"><button class="btn ghost" data-close>취소</button><button class="btn primary" id="ttSave">저장</button></div>';
@@ -1238,12 +1240,13 @@
       '<div class="modal-body"><div class="field"><label>과목 이름</label><input id="f-name" placeholder="예: 자료구조" value="'+esc(s.name)+'"></div>'+
       '<div class="row2"><div class="field"><label>시험 날짜 <span class="hint">미정이면 비워두세요</span></label><input id="f-exam" type="date" value="'+esc(s.exam)+'"></div>'+
       '<div class="field"><label>공부 강도</label><select id="f-load">'+[1,2,3].map(function(w){return '<option value="'+w+'" '+(s.workload==w?"selected":"")+'>'+WORKLOAD[w].label+' (하루 '+WORKLOAD[w].upd+'개)</option>';}).join("")+'</select></div></div>'+
+      '<div class="field"><label>준비 시작 <span class="hint">이 과목을 시험 며칠 전부터 시작할지</span></label><select id="f-prep">'+[[0,"자동 (약 한 달 전)"],[2,"2주 전부터"],[3,"3주 전부터"],[4,"4주 전부터"],[5,"5주 전부터"],[6,"6주 전부터"]].map(function(o){return '<option value="'+o[0]+'" '+((+s.prep||0)===o[0]?"selected":"")+'>'+o[1]+'</option>';}).join("")+'</select></div>'+
       '<div class="field"><label>시험 범위 <span class="hint">쉼표 또는 줄바꿈으로 구분 — 예: 1장, 2장, 3장</span></label><textarea id="f-scope" placeholder="1장 배열, 2장 연결리스트, 3장 스택/큐 ...">'+esc(s.scope||"")+'</textarea></div>'+
       '<div class="plan-preview" id="planPrev"></div>'+
       '<div class="field"><label>자료 (강의노트·링크 등)</label><div id="f-mats"></div><button class="add-mat" id="addMat">+ 자료 추가</button></div></div>'+
       '<div class="modal-foot"><button class="btn ghost" data-close>취소</button><button class="btn primary" id="saveSubj">'+(edit?"저장":"추가")+'</button></div>';
-    function refreshPrev(){ $("planPrev").innerHTML=planSummary($("f-exam").value, +$("f-load").value, $("f-scope").value); }
-    ["f-exam","f-load","f-scope"].forEach(function(fid){ $(fid).addEventListener("input",refreshPrev); $(fid).addEventListener("change",refreshPrev); });
+    function refreshPrev(){ $("planPrev").innerHTML=planSummary($("f-exam").value, +$("f-load").value, $("f-scope").value, +$("f-prep").value); }
+    ["f-exam","f-load","f-scope","f-prep"].forEach(function(fid){ $(fid).addEventListener("input",refreshPrev); $(fid).addEventListener("change",refreshPrev); });
     refreshPrev();
     var matsHost=$("f-mats");
     function drawMats(){ matsHost.innerHTML="";
@@ -1256,7 +1259,7 @@
       var name=$("f-name").value.trim(), exam=$("f-exam").value;
       if(!name){ $("f-name").focus(); return; }   // 시험일은 선택(미정 과목 허용)
       var clean=mats.filter(function(m){return (m.label||"").trim()||(m.url||"").trim();}).map(function(m){return {label:(m.label||"").trim()||m.url,url:(m.url||"").trim()};});
-      store.saveSubject({id:s.id,name:name,exam:exam,workload:+$("f-load").value,scope:$("f-scope").value.trim(),colorIdx:s.colorIdx||0,materials:clean,done:s.done||{},learned:s.learned||{}}).then(closeModal);
+      store.saveSubject({id:s.id,name:name,exam:exam,workload:+$("f-load").value,prep:+$("f-prep").value||0,scope:$("f-scope").value.trim(),colorIdx:s.colorIdx||0,materials:clean,done:s.done||{},learned:s.learned||{}}).then(closeModal);
     });
     openScrim("f-name");
   }
