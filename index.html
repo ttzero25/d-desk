@@ -414,8 +414,15 @@
   // 요일별 수업 수(getDay: 0=일 … 6=토). 공강·주말일수록 공부 여유가 큼 → 학습 배분 가중치↑
   //  월: 데이터통신·정보보호프로젝트2 / 화: AI보안·운영체제 / 수: 소프트웨어특강2·데이터통신·생명정보과학 / 목: 운영체제 / 금: 공강
   var TIMETABLE={0:0, 1:2, 2:2, 3:3, 4:1, 5:0, 6:0};
-  // 하루 학습 배분 가중치: 수업 없음(금공강/주말)=3, 1과목=2, 2과목=1.4, 3과목이상=1
-  function dayCapacity(key){ var c=TIMETABLE[parseKey(key).getDay()]; if(c==null)c=1; return c<=0?3:c===1?2:c===2?1.4:1; }
+  // 하루 학습 배분 가중치: 여유 클수록↑ (공휴일·금공강·주말=3, 1과목=2, 2과목=1.4, 3과목↑=1)
+  //  + 사용자가 추가한 그 날 일정(이벤트)만큼 여유를 깎아 계획이 자동으로 그 날을 덜/안 잡게 함
+  function dayCapacity(key){
+    var cap;
+    if(holidayName(key)) cap=3;                 // 공휴일: 수업 없음 → 추석·설 등은 시험공부 황금기간
+    else { var c=TIMETABLE[parseKey(key).getDay()]; if(c==null)c=1; cap=c<=0?3:c===1?2:c===2?1.4:1; }
+    cap -= eventsOnDay(key)*1.0;                 // 그 날 단일 일정 하나당 여유 1 감소
+    return cap<0.3?0.3:cap;
+  }
   var CATS=["school","commsec","asc","etc"];
   var CAT={ school:{label:"학교",color:"#4f46e5"}, commsec:{label:"연구실",color:"#0891b2"}, asc:{label:"동아리",color:"#db2777"}, etc:{label:"기타",color:"#79828f"} };
   var TABS=[
@@ -507,12 +514,17 @@
   function toggleOcc(t,occKey){ var b=Object.assign({},t); if(t.repeat){ b.doneDates=Object.assign({},t.doneDates||{}); if(b.doneDates[occKey]) delete b.doneDates[occKey]; else b.doneDates[occKey]=true; } else { b.done=!b.done; } return b; }
   function nextOcc(t,tKey){ var arr=taskOccurrences(t,tKey,addDays(tKey,420)); if(arr.length) return arr[0]; var r=taskRange(t); return r?{start:r.start,end:r.end,occ:r.start}:null; }
   function timeLabel(t){ if(!t.startTime) return ""; return t.startTime+(t.endTime?"~"+t.endTime:""); }
-  // 학습계획용: 공휴일/시험일/여러 날 일정으로 '바쁜' 날인지
+  // 학습계획용: 시험일/여러 날 일정으로 아예 공부 불가한 '바쁜' 날인지 (공휴일은 제외하지 않고 여유일로 활용)
   function isBusyDay(key){
-    if(holidayName(key)) return true;
     var subs=subjects(); for(var id in subs){ if(subs[id].exam===key) return true; }
     var tk=tasks(); for(var tid in tk){ var t=tk[tid]; var r=taskRange(t); if(r&&r.isRange&&taskCoversDay(t,key)) return true; }
     return false;
+  }
+  // 그 날에 걸친 '단일 일정(이벤트)' 수 — 여러 날 일정은 isBusyDay로 이미 제외되므로 세지 않음
+  function eventsOnDay(key){
+    var tk=tasks(), n=0;
+    for(var id in tk){ var t=tk[id]; var r=taskRange(t); if(r&&r.isRange) continue; if(taskCoversDay(t,key)) n++; }
+    return n;
   }
   // 짧은 상태 배지 {t:라벨, c:색클래스}
   function shortStatus(startK,endK,done,tKey){
@@ -537,7 +549,7 @@
     function done(extra){ return Object.assign({days:[],startKey:null,tight:false,upd:upd,units:allUnits,remaining:units.length,learnedCount:learnedCount,avoided:false,catchup:false}, extra); }
     if (toExam<0) return done({});
     if (toExam===0) return done({days:[{key:tKey,units:units.length?units.slice():allUnits.slice(),review:true}],startKey:tKey,tight:units.length>0});
-    // 오늘~시험 전날 중, 공휴일·바쁜 날은 제외한 '학습 가능일'
+    // 오늘~시험 전날 중, 시험일·여러 날 일정만 제외한 '학습 가능일' (공휴일은 포함해 여유일로 활용)
     var all=[]; for(var o=0;o<toExam;o++) all.push(addDays(tKey,o));
     var usable=all.filter(function(k){ return !isBusyDay(k); });
     var avoided = usable.length<all.length;
@@ -1030,7 +1042,7 @@
     if(units===0){ line='범위를 입력하면 하루 배분량을 계산해요. 현재는 강도 기준으로 <b>'+p.days.length+'번</b>의 공부 세션을 배치했어요.'; }
     else if(p.tight){ var perday=Math.ceil(units/Math.max(1,p.days.length-reviewCount)); line='<span class="warn">일정이 빠듯해요.</span> 오늘 바로 시작해서 <b>하루 약 '+perday+'개</b>씩, 총 '+units+'개 범위를 소화해야 해요.'; }
     else { line='가장 효율적인 시작일은 <b>'+fmtDate(p.startKey)+' ('+ddayLabel(diffDays(todayKey(),p.startKey))+')</b> 이에요. '+(diffDays(todayKey(),p.startKey)>0?'그 전까진 여유! ':'')+'<b>하루 '+p.upd+'개</b>씩 진행하면 딱 맞아요.'; }
-    return line + (reviewCount?' 시험 직전 <b>'+reviewCount+'일</b>은 전체 복습으로 잡았어요.':'') + (p.avoided?' <span style="color:var(--muted)">공휴일·바쁜 날은 자동 제외했어요.</span>':'');
+    return line + (reviewCount?' 시험 직전 <b>'+reviewCount+'일</b>은 전체 복습으로 잡았어요.':'') + ' <span style="color:var(--muted)">공휴일(추석·설 등)은 여유일로 더 배분하고, 시험일·등록한 일정은 자동 반영해요.</span>';
   }
 
   function openSubjectModal(s){
