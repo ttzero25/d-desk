@@ -1116,7 +1116,7 @@
         if(o.isRange){ if(k>=o.start&&k<=o.end && !(laneOf[o.key]<MAXLANE)){ if(o.t.type==="exam")hasExam=true; dotsArr.push('<i class="due" style="background:'+duecol(o.t)+'"></i>'); } }
         else if(o.start===k){ if(o.t.type==="exam")hasExam=true; dotsArr.push('<i class="due" style="background:'+duecol(o.t)+'"></i>'); }
       });
-      if(masterPlanOn(k)) dotsArr.unshift('<i style="background:var(--accent)"></i>');
+      if(filter==="school" && masterPlanOn(k)) dotsArr.unshift('<i style="background:var(--accent)"></i>');
       var hol=holidayName(k);
       var cls="cal-cell"+(other?" other":"")+(k===tKey?" today":(dow===0?" sun":dow===6?" sat":""))+(k===selKey?" sel":"")+(hasExam?" hasexam":"")+(hol?" holiday":"");
       html+='<button class="'+cls+'" data-action="cal-day" data-key="'+k+'"><span class="cn">'+cd.getDate()+'</span>'+(hol?'<span class="cal-hol">'+esc(hol)+'</span>':'')+(bars?'<span class="cal-bars">'+bars+'</span>':'')+'<span class="cal-dots">'+dotsArr.slice(0,4).join("")+'</span></button>';
