@@ -330,6 +330,10 @@
   .plan-row.done{opacity:.5;} .plan-row.done .pr-u{text-decoration:line-through;}
   @media (max-width:480px){ .plan-row .pr-line{grid-template-columns:46px 58px auto;} .plan-row .pr-u{grid-column:2 / -1;} .plan-row .pr-do{padding-left:0;} }
   /* 종합 주차별 계획표(정적) */
+  .mp-phead{cursor:pointer;user-select:none;} .mp-phead:hover h2{color:var(--accent);}
+  .mp-caret{display:inline-block;margin-left:4px;transition:transform .15s;color:var(--muted);font-size:11px;}
+  #mplanPanel.collapsed .mp-pbody{display:none;}
+  #mplanPanel.collapsed .mp-caret{transform:rotate(-90deg);}
   .mplan{display:flex;flex-direction:column;gap:16px;}
   .mp-wk{border:1px solid var(--line);border-radius:var(--radius-sm,10px);overflow:hidden;}
   .mp-whead{padding:10px 13px;background:var(--surface-2);border-bottom:1px solid var(--line);}
@@ -432,9 +436,9 @@
     <div class="stats" id="stats"></div>
     <div id="scopeMgr" style="margin-bottom:18px"></div>
     <div class="col">
-      <section class="panel">
-        <div class="panel-head"><h2>학습 계획 · 주차별 계획표</h2><span class="count">9/21–10/22 · 5주</span></div>
-        <div class="panel-body">
+      <section class="panel" id="mplanPanel">
+        <div class="panel-head mp-phead" data-mp-toggle role="button" tabindex="0" aria-expanded="true"><h2>학습 계획 · 주차별 계획표</h2><span class="count">9/21–10/22 · 5주 <span class="mp-caret">▾</span></span></div>
+        <div class="panel-body mp-pbody">
           <div class="mplan">
             <div class="mp-wk">
               <div class="mp-whead">
@@ -510,14 +514,6 @@
             </div>
           </div>
         </div>
-      </section>
-      <section class="panel">
-        <div class="panel-head"><h2>시험 과목 · 학습 계획</h2><span class="count" id="subjCount"></span></div>
-        <div class="panel-body"><div class="subj-list" id="subjects"></div></div>
-      </section>
-      <section class="panel">
-        <div class="panel-head"><h2>날짜별 학습 일정</h2><span class="count" id="agendaCount"></span></div>
-        <div class="panel-body" id="agenda"></div>
       </section>
       <section class="panel">
         <div class="panel-head"><h2>학교 할 일 (시험·과제)</h2><span class="count" id="schoolTaskCount"></span></div>
@@ -965,6 +961,19 @@
   function loadMpDone(){ try{ return JSON.parse(localStorage.getItem(MP_DONE_KEY)||"{}")||{}; }catch(e){ return {}; } }
   function saveMpDone(m){ try{ localStorage.setItem(MP_DONE_KEY,JSON.stringify(m)); }catch(e){} }
   function enhanceMasterPlan(){
+    var panel=document.getElementById('mplanPanel');
+    if(panel && !panel.__mpToggle){
+      panel.__mpToggle=true;
+      var head=panel.querySelector('[data-mp-toggle]');
+      var collapsed=false; try{ collapsed=localStorage.getItem('dd_mplan_collapsed')==='1'; }catch(e){}
+      if(collapsed) panel.classList.add('collapsed');
+      if(head){
+        head.setAttribute('aria-expanded', collapsed?'false':'true');
+        var toggle=function(){ var now=panel.classList.toggle('collapsed'); head.setAttribute('aria-expanded', now?'false':'true'); try{ localStorage.setItem('dd_mplan_collapsed', now?'1':'0'); }catch(e){} };
+        head.addEventListener('click',toggle);
+        head.addEventListener('keydown',function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); toggle(); } });
+      }
+    }
     var rows=document.querySelectorAll('.mp-row[data-date]');
     if(!rows.length) return;
     var done=loadMpDone();
@@ -1176,6 +1185,7 @@
 
   function renderSubjects(tKey){
     var subs=subjects(), ids=Object.keys(subs), host=$("subjects");
+    if(!host) return;
     $("subjCount").textContent=ids.length?ids.length+"과목":"";
     if(!ids.length){ host.innerHTML='<div class="panel-empty">아직 과목이 없어요.<br>상단 ‘과목’ 버튼으로 시험 과목과 범위를 등록하면 학습 계획이 자동으로 짜여요.</div>'; return; }
     var arr=ids.map(function(id){return subs[id];}).sort(function(a,b){ var na=!a.exam,nb=!b.exam; if(na!==nb)return na?1:-1; var da=diffDays(tKey,a.exam),db_=diffDays(tKey,b.exam); if(da<0&&db_>=0)return 1; if(db_<0&&da>=0)return -1; return da-db_; });
@@ -1236,6 +1246,7 @@
   }
 
   function renderAgenda(tKey){
+    if(!$("agenda")) return;
     var map={}; function slot(k){ if(!map[k]) map[k]={exams:[],dues:[],study:[]}; return map[k]; }
     var subs=subjects(), tk=tasks();
     Object.keys(subs).forEach(function(id){ var s=subs[id]; if(diffDays(tKey,s.exam)>=0) slot(s.exam).exams.push(s); (PLANS[id]?PLANS[id].days:[]).forEach(function(d){ if(!(s.exam===d.key)) slot(d.key).study.push({s:s,plan:d}); }); });
