@@ -85,6 +85,10 @@
   .cal-dots i{width:6px;height:6px;border-radius:50%;display:block;}
   .cal-dots i.due{width:7px;height:7px;border-radius:2px;}
   .cal-dots i.ring{box-shadow:0 0 0 1.5px var(--surface-2);}
+  /* 과제/발표: 주황색 체크박스 마커 */
+  .cal-dots i.cal-chk{width:9px;height:9px;border-radius:2px;border:1.5px solid var(--soon);background:transparent;position:relative;}
+  .cal-dots i.cal-chk.on{background:var(--soon);}
+  .cal-dots i.cal-chk.on::after{content:"";position:absolute;left:2px;top:0px;width:2px;height:4px;border:solid #fff;border-width:0 1.5px 1.5px 0;transform:rotate(45deg);}
   .cal-bars{display:flex;flex-direction:column;gap:2px;margin:3px -6px 0;}
   .cal-bar{height:5px;border-radius:1px;display:block;}
   .cal-bar.spacer{background:transparent!important;}
@@ -1113,8 +1117,11 @@
       if(showExam) s.exams.forEach(function(){ hasExam=true; dotsArr.push('<i style="background:var(--urgent)"></i>'); });
       if(showStudy) s.study.forEach(function(o){ dotsArr.push('<i style="background:'+subjColor(o.s)+'"></i>'); });
       occItems.forEach(function(o){
-        if(o.isRange){ if(k>=o.start&&k<=o.end && !(laneOf[o.key]<MAXLANE)){ if(o.t.type==="exam")hasExam=true; dotsArr.push('<i class="due" style="background:'+duecol(o.t)+'"></i>'); } }
-        else if(o.start===k){ if(o.t.type==="exam")hasExam=true; dotsArr.push('<i class="due" style="background:'+duecol(o.t)+'"></i>'); }
+        var here=o.isRange?(k>=o.start&&k<=o.end && !(laneOf[o.key]<MAXLANE)):(o.start===k);
+        if(!here) return;
+        if(o.t.type==="exam") hasExam=true;
+        if(o.t.type==="hw") dotsArr.push('<i class="cal-chk'+(occDone(o.t,o.occ)?" on":"")+'"></i>');
+        else dotsArr.push('<i class="due" style="background:'+duecol(o.t)+'"></i>');
       });
       if(filter==="school" && masterPlanOn(k)) dotsArr.unshift('<i style="background:var(--accent)"></i>');
       var hol=holidayName(k);
@@ -1141,7 +1148,7 @@
     if(mp) items+='<div class="titem"><span class="dot" style="background:var(--accent)"></span><span class="badge2 cn">계획</span><span class="tx">'+esc(mp)+'</span></div>';
     s.exams.forEach(function(x){ items+='<div class="titem"><span class="dot" style="background:'+subjColor(x)+'"></span><span class="badge2 ex">시험</span><span class="tx">'+esc(x.name)+'</span></div>'; });
     s.dues.forEach(function(d){ var t=d.t, sc=(CAT[t.cat]||CAT.etc).color, done=occDone(t,d.occ), tl=timeLabel(t);
-      items+='<div class="titem '+(done?"done":"")+'"><span class="dot" style="background:'+sc+'"></span>'+(t.type==="exam"?'<span class="badge2 ex">시험</span>':'<span class="badge2 du">'+(CAT[t.cat]||CAT.etc).label+'</span>')+'<span class="tx">'+(tl?'<b style="font-family:var(--mono);font-weight:600">'+esc(tl)+'</b> ':'')+esc(t.title)+(t.repeat?' <span class="scope">'+REPEAT[t.repeat]+'</span>':'')+'</span></div>'; });
+      items+='<div class="titem '+(done?"done":"")+'"><span class="dot" style="background:'+sc+'"></span>'+(t.type==="exam"?'<span class="badge2 ex">시험/고사</span>':t.type==="hw"?'<span class="badge2 du">과제/발표</span>':'<span class="badge2 du">'+(CAT[t.cat]||CAT.etc).label+'</span>')+'<span class="tx">'+(tl?'<b style="font-family:var(--mono);font-weight:600">'+esc(tl)+'</b> ':'')+esc(t.title)+(t.repeat?' <span class="scope">'+REPEAT[t.repeat]+'</span>':'')+'</span></div>'; });
     if(!items) items='<div class="empty-line">이 날은 별다른 일정이 없어요.</div>';
     $("dayDetail").innerHTML='<div class="dh"><span class="rel">'+rel+'</span></div><div class="items">'+items+'</div>';
   }
@@ -1262,7 +1269,7 @@
       var s=map[k]||{exams:[],dues:[],study:[]}, n=diffDays(tKey,k), dt=parseKey(k);
       var rel=n===0?"오늘":n===1?"내일":ddayLabel(n), items="";
       s.exams.forEach(function(x){ items+='<div class="titem"><span class="dot" style="background:'+subjColor(x)+'"></span><span class="badge2 ex">시험</span><span class="tx">'+esc(x.name)+'</span></div>'; });
-      s.dues.forEach(function(d){ var t=d.t, done=occDone(t,d.occ), tl=timeLabel(t); items+='<div class="titem '+(done?"done":"")+'"><span class="dot" style="background:'+(CAT[t.cat]||CAT.etc).color+'"></span>'+(t.type==="exam"?'<span class="badge2 ex">시험</span>':'<span class="badge2 du">과제</span>')+'<span class="tx">'+(tl?esc(tl)+' ':'')+esc(t.title)+'</span></div>'; });
+      s.dues.forEach(function(d){ var t=d.t, done=occDone(t,d.occ), tl=timeLabel(t); items+='<div class="titem '+(done?"done":"")+'"><span class="dot" style="background:'+(CAT[t.cat]||CAT.etc).color+'"></span>'+(t.type==="exam"?'<span class="badge2 ex">시험/고사</span>':t.type==="hw"?'<span class="badge2 du">과제/발표</span>':'<span class="badge2 du">과제</span>')+'<span class="tx">'+(tl?esc(tl)+' ':'')+esc(t.title)+'</span></div>'; });
       s.study.forEach(function(o){ var done=o.s.done&&o.s.done[k], md=planMode(o.plan);
         items+='<div class="titem '+(done?"done":"")+'"><span class="dot" style="background:'+subjColor(o.s)+'"></span><span class="badge2 '+md.c+'">'+md.t+'</span><span class="tx">'+esc(calSubjName(o.s.name))+(o.plan.units.length?' <span class="scope">· '+esc(scopeStr(o.plan.units))+'</span>':(o.plan.review?' <span class="scope">· 전 범위</span>':''))+'</span></div>'; });
       if(!items) items='<div class="titem"><span class="tx" style="color:var(--muted)">여유 있는 날</span></div>';
@@ -1272,8 +1279,9 @@
 
   function taskRow(t, subs, tKey){
     var s=t.subjectId&&subs[t.subjectId];
+    var sName=s?s.name:(t.subjectId||""), sCol=s?subjColor(s):"var(--soon)";
     var c=CAT[t.cat]||CAT.etc;
-    var tag='<span class="cat-chip" style="background:'+c.color+'22;color:'+c.color+'"><span class="cdot" style="background:'+c.color+'"></span>'+c.label+'</span>'+(s?'<span class="tag"><span class="dot" style="background:'+subjColor(s)+'"></span>'+esc(calSubjName(s.name))+'</span>':'');
+    var tag='<span class="cat-chip" style="background:'+c.color+'22;color:'+c.color+'"><span class="cdot" style="background:'+c.color+'"></span>'+c.label+'</span>'+(sName?'<span class="tag"><span class="dot" style="background:'+sCol+'"></span>'+esc(calSubjName(sName))+'</span>':'');
     var no=nextOcc(t,tKey), done=t.repeat?occDone(t,no?no.occ:""):!!t.done;
     var dm="";
     if(no){ var isR=no.end!==no.start, st=shortStatus(no.start,no.end,done,tKey);
@@ -1470,7 +1478,10 @@
     var edit=!!t; t=t||{title:"",cat:presetCat||"school",subjectId:"",start:presetDate||"",due:"",done:false};
     var subs=subjects();
     var catOpts=CATS.map(function(c){return '<option value="'+c+'" '+(t.cat===c?"selected":"")+'>'+CAT[c].label+' ('+c+')</option>';}).join("");
-    var subjOpts='<option value="">과목 연결 안 함</option>'+Object.keys(subs).map(function(id){return '<option value="'+id+'" '+(t.subjectId===id?"selected":"")+'>'+esc(subs[id].name)+'</option>';}).join("");
+    var SUBJECT_CHOICES=["정보보호프로젝트2","생명정보과학","소프트웨어특강"];
+    var subjOpts='<option value="">과목 연결 안 함</option>'+
+      Object.keys(subs).map(function(id){return '<option value="'+id+'" '+(t.subjectId===id?"selected":"")+'>'+esc(calSubjName(subs[id].name))+'</option>';}).join("")+
+      SUBJECT_CHOICES.map(function(nm){return '<option value="'+esc(nm)+'" '+(t.subjectId===nm?"selected":"")+'>'+esc(calSubjName(nm))+'</option>';}).join("");
     modal.innerHTML='<div class="modal-head"><h3>'+(edit?"일정 편집":"일정 추가")+'</h3><button class="btn icon ghost" data-close>'+X+'</button></div>'+
       '<div class="modal-body"><div class="field"><label>내용</label><input id="t-title" placeholder="예: 리포트 제출 / 랩미팅 / 공연 리허설" value="'+esc(t.title)+'"></div>'+
       '<div class="field"><label>분류</label><select id="t-cat">'+catOpts+'</select></div>'+
@@ -1478,17 +1489,21 @@
       '<div class="row2"><div class="field"><label>시작 시간 <span class="hint">선택</span></label><input id="t-stime" type="time" value="'+esc(t.startTime||"")+'"></div><div class="field"><label>종료 시간 <span class="hint">선택</span></label><input id="t-etime" type="time" value="'+esc(t.endTime||"")+'"></div></div>'+
       '<div class="row2"><div class="field"><label>반복</label><select id="t-rep">'+["","daily","weekly","biweekly","monthly"].map(function(rp){return '<option value="'+rp+'" '+(t.repeat===rp?"selected":"")+'>'+REPEAT[rp]+'</option>';}).join("")+'</select></div><div class="field"><label>반복 종료일 <span class="hint">선택</span></label><input id="t-repuntil" type="date" value="'+esc(t.repeatUntil||"")+'"></div></div>'+
       '<div class="field"><label>연결 과목 <span class="hint">(학교 과제일 때)</span></label><select id="t-subj">'+subjOpts+'</select></div>'+
-      '<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;color:var(--ink-2)"><input type="checkbox" id="t-exam" '+(t.type==="exam"?"checked":"")+' style="width:auto;margin:0"> 시험/고사로 표시 <span class="hint">캘린더에 빨간색</span></label>'+
+      '<div style="display:flex;flex-direction:column;gap:8px;margin-top:2px">'+
+        '<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;color:var(--ink-2)"><input type="checkbox" id="t-exam" '+(t.type==="exam"?"checked":"")+' style="width:auto;margin:0"> 시험/고사로 표시 <span class="hint">캘린더에 빨간색</span></label>'+
+        '<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;color:var(--ink-2)"><input type="checkbox" id="t-hw" '+(t.type==="hw"?"checked":"")+' style="width:auto;margin:0"> 과제/발표로 표시 <span class="hint">캘린더에 주황색 체크박스</span></label>'+
+      '</div>'+
       '<div class="field"><label>메모</label><textarea id="t-note" placeholder="세부 내용·준비물·장소 등">'+esc(t.note||"")+'</textarea></div></div>'+
       '<div class="modal-foot"><button class="btn ghost" data-close>취소</button><button class="btn primary" id="saveTask">'+(edit?"저장":"추가")+'</button></div>';
     modal.querySelectorAll("[data-close]").forEach(function(b){ b.addEventListener("click",closeModal); });
+    (function(){ var ex=$("t-exam"), hw=$("t-hw"); if(ex&&hw){ ex.addEventListener("change",function(){ if(ex.checked) hw.checked=false; }); hw.addEventListener("change",function(){ if(hw.checked) ex.checked=false; }); } })();
     $("saveTask").addEventListener("click",function(){
       var title=$("t-title").value.trim(); if(!title){ $("t-title").focus(); return; }
       var start=$("t-start").value, due=$("t-due").value;
       if(!due && start){ due=start; }
       if(start && due && start>due){ var tmp=start; start=due; due=tmp; }
       if(start===due){ start=""; }   // 단일 일정이면 시작일 비움
-      store.saveTask({id:t.id,title:title,cat:$("t-cat").value,subjectId:$("t-subj").value,start:start,due:due,startTime:$("t-stime").value,endTime:$("t-etime").value,repeat:$("t-rep").value,repeatUntil:$("t-repuntil").value,type:$("t-exam").checked?"exam":"",note:$("t-note").value.trim(),done:t.done||false,doneDates:t.doneDates||{}}).then(closeModal);
+      store.saveTask({id:t.id,title:title,cat:$("t-cat").value,subjectId:$("t-subj").value,start:start,due:due,startTime:$("t-stime").value,endTime:$("t-etime").value,repeat:$("t-rep").value,repeatUntil:$("t-repuntil").value,type:$("t-exam").checked?"exam":($("t-hw").checked?"hw":""),note:$("t-note").value.trim(),done:t.done||false,doneDates:t.doneDates||{}}).then(closeModal);
     });
     openScrim("t-title");
   }
