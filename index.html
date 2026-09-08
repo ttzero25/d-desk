@@ -391,7 +391,6 @@
 
   <!-- HOME -->
   <div class="tabpane" id="tab-home">
-    <div id="todayCard"></div>
     <div class="home-grid">
       <section class="panel">
         <div class="cal-top">
@@ -993,6 +992,7 @@
           var d=loadMpDone();
           if(chk.checked){ d[key]=1; row.classList.add('done'); } else { delete d[key]; row.classList.remove('done'); }
           saveMpDone(d);
+          renderStats(todayKey());
         });
       }
       if(done[key]){ chk.checked=true; row.classList.add('done'); }
@@ -1173,13 +1173,16 @@
     var up=Object.keys(subs).map(function(id){return subs[id];}).filter(function(s){return diffDays(tKey,s.exam)>=0;}).sort(function(a,b){return a.exam<b.exam?-1:1;});
     var openT=Object.keys(tk).map(function(id){return tk[id];}).filter(function(t){return !t.done;});
     var soonT=openT.filter(function(t){return t.due&&diffDays(tKey,t.due)<=3;});
-    var todayUnits=0; Object.keys(PLANS).forEach(function(id){ var d=studyOnDay(id,tKey); if(d) todayUnits+=Math.max(1,d.units.length); });
+    // 주차별 계획표(정적) 기준으로 오늘 학습량 · 남은 할 일 계산
+    var mpDone=loadMpDone(), tp=masterPlanOn(tKey);
+    var todayCount=tp?tp.split(" + ").length:0, todayDone=!!mpDone[tKey];
+    var planDaysLeft=0; Object.keys(MASTER_PLAN).forEach(function(k){ if(k>=tKey && !mpDone[k]) planDaysLeft++; });
     var ne=up[0];
     $("stats").innerHTML=
       stat("다음 시험", ne?ddayLabel(diffDays(tKey,ne.exam)):"—", ne?esc(ne.name):"예정 없음")+
       stat("남은 시험", up.length, up.length?"마지막 "+ddayLabel(diffDays(tKey,up[up.length-1].exam)):"모두 완료")+
-      stat("오늘 학습량", todayUnits?todayUnits+"개":"0", todayUnits?"범위/세션 기준":"오늘은 휴식 가능")+
-      stat("남은 할 일", openT.length, soonT.length?soonT.length+"개 임박":"임박 없음");
+      stat("오늘 학습량", todayCount?todayCount+"개":"0", tp?(todayDone?"오늘 완료 ✓":"오늘 목표 · 미완료"):"오늘은 계획 없음")+
+      stat("남은 할 일", planDaysLeft+openT.length, soonT.length?soonT.length+"개 임박":(planDaysLeft?"계획 "+planDaysLeft+"일 남음":"임박 없음"));
   }
   function stat(l,v,s){ return '<div class="stat"><div class="lbl">'+esc(l)+'</div><div class="val">'+esc(v)+'</div><div class="sub">'+esc(s)+'</div></div>'; }
 
