@@ -366,6 +366,16 @@
   .mp-row.mp-today{background:var(--accent-soft);}
   .mp-row.mp-today .mp-md{color:var(--accent-ink);font-weight:700;}
   /* Memo (옵시디언식 마크다운) */
+  .graph-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+  .graph-top h2{font-size:15px;}
+  .graph-canvas{position:relative;height:72vh;background:radial-gradient(circle at 50% 42%, var(--surface) 0%, var(--surface-2) 100%);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow-sm);}
+  .graph-node{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:6px;background:none;border:none;cursor:pointer;padding:0;}
+  .gn-dot{width:20px;height:20px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 4px var(--accent-soft),0 2px 8px rgba(0,0,0,.15);transition:background .15s,box-shadow .15s;animation:gnFloat 5s ease-in-out infinite alternate;}
+  .graph-node:hover .gn-dot{background:var(--accent-ink);box-shadow:0 0 0 7px var(--accent-soft),0 5px 16px rgba(0,0,0,.28);}
+  .gn-label{font-size:11.5px;color:var(--ink-2);max-width:130px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center;}
+  .graph-node:hover .gn-label{color:var(--accent-ink);}
+  @keyframes gnFloat{from{transform:translateY(-3px);}to{transform:translateY(3px);}}
+  .graph-empty{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;color:var(--muted);font-size:13px;line-height:1.6;}
   .memo2{display:grid;grid-template-columns:236px 1fr;gap:16px;align-items:start;}
   .memo-side{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow-sm);overflow:hidden;position:sticky;top:12px;}
   .memo-side-top{display:flex;align-items:center;justify-content:space-between;padding:11px 12px;border-bottom:1px solid var(--line);font-size:13px;font-weight:700;}
@@ -580,13 +590,18 @@
 
   <!-- MEMO -->
   <div class="tabpane" id="tab-memo" hidden>
-    <div class="memo2" id="memo2">
+    <div class="memo-graph" id="memoGraph">
+      <div class="graph-top"><h2>노트 그래프 <span class="hint" style="font-weight:400;color:var(--muted)">점을 눌러 편집</span></h2><button class="btn primary" id="graphNew" style="padding:6px 11px"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>새 노트</button></div>
+      <div class="graph-canvas" id="graphCanvas"></div>
+    </div>
+    <div class="memo2" id="memo2" hidden>
       <aside class="memo-side">
         <div class="memo-side-top"><span>노트</span><button class="btn primary" id="noteNew" style="padding:5px 9px;font-size:12px">+ 새 노트</button></div>
         <div class="note-list" id="noteList"></div>
       </aside>
       <section class="panel memo-main">
         <div class="panel-head">
+          <button class="btn icon ghost" id="toGraph" title="노트 그래프로" aria-label="노트 그래프로"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="6" cy="6" r="2.4"/><circle cx="18" cy="7" r="2.4"/><circle cx="12" cy="17" r="2.4"/><path d="M7.8 7.2l2.6 8M16.4 8.6l-3 6.6"/></svg></button>
           <input id="noteTitle" class="note-title-input" placeholder="제목 없음">
           <div class="memo-modes">
             <button class="btn" data-memo-mode="split">나란히</button>
@@ -1679,6 +1694,20 @@
   }
   function newNote(){ var ns=loadNotes(), id=makeId(); ns[id]={id:id,title:"",body:"",updated:Date.now()}; saveNotes(ns); openNote(id); if($("noteTitle")) $("noteTitle").focus(); }
   function saveActiveNote(){ var ns=loadNotes(), n=ns[activeNote]; if(!n) return; n.title=$("noteTitle")?$("noteTitle").value:n.title; n.body=$("memoEdit")?$("memoEdit").value:n.body; n.updated=Date.now(); saveNotes(ns); }
+  function renderGraph(){
+    var host=$("graphCanvas"); if(!host) return;
+    var ns=loadNotes(), ids=noteOrder(ns);
+    if(!ids.length){ host.innerHTML='<div class="graph-empty">아직 노트가 없어요.<br>‘+ 새 노트’로 첫 노트를 만들어 보세요.</div>'; return; }
+    var GA=2.399963229, n=ids.length, maxR=Math.sqrt(Math.max(0,n-1));
+    host.innerHTML=ids.map(function(id,i){
+      var n0=ns[id], ang=i*GA, rn=maxR?Math.sqrt(i)/maxR:0;
+      var x=50+rn*42*Math.cos(ang), y=50+rn*40*Math.sin(ang);
+      var sz=Math.max(16,Math.min(46,16+(n0.body||"").length/40));
+      return '<button class="graph-node" data-note="'+id+'" style="left:'+x.toFixed(1)+'%;top:'+y.toFixed(1)+'%"><span class="gn-dot" style="width:'+sz.toFixed(0)+'px;height:'+sz.toFixed(0)+'px;animation-delay:'+(i*0.3).toFixed(1)+'s"></span><span class="gn-label">'+esc(noteTitleOf(n0))+'</span></button>';
+    }).join("");
+  }
+  function showGraph(){ renderGraph(); if($("memoGraph")) $("memoGraph").hidden=false; if($("memo2")) $("memo2").hidden=true; if($("memoRead")) $("memoRead").hidden=true; }
+  function showEditor(){ if($("memoGraph")) $("memoGraph").hidden=true; if($("memo2")) $("memo2").hidden=false; if($("memoRead")) $("memoRead").hidden=true; }
   function initMemo(){
     if(memoInited) return;
     var wrap=$("memoWrap"), edit=$("memoEdit"), titleI=$("noteTitle"); if(!wrap||!edit) return; memoInited=true;
@@ -1698,11 +1727,15 @@
       var rest=noteOrder(ns);
       if(rest.length) openNote(rest[0]); else newNote();
     });
-    $("notePublish").addEventListener("click",function(){ var n=currentNote(); if(!n) return; $("readTitle").textContent=noteTitleOf(n); $("readBody").innerHTML=mdToHtml(n.body); $("memo2").hidden=true; $("memoRead").hidden=false; });
-    $("readBack").addEventListener("click",function(){ $("memoRead").hidden=true; $("memo2").hidden=false; });
+    $("notePublish").addEventListener("click",function(){ var n=currentNote(); if(!n) return; $("readTitle").textContent=noteTitleOf(n); $("readBody").innerHTML=mdToHtml(n.body); $("memoGraph").hidden=true; $("memo2").hidden=true; $("memoRead").hidden=false; });
+    $("readBack").addEventListener("click",function(){ showEditor(); });
+    $("graphCanvas").addEventListener("click",function(e){ var b=e.target.closest("[data-note]"); if(b){ openNote(b.getAttribute("data-note")); showEditor(); } });
+    $("graphNew").addEventListener("click",function(){ newNote(); showEditor(); });
+    $("toGraph").addEventListener("click",showGraph);
     var setMode=function(m){ wrap.className="memo-wrap mode-"+m; Array.prototype.forEach.call(document.querySelectorAll("[data-memo-mode]"),function(b){ b.classList.toggle("on",b.getAttribute("data-memo-mode")===m); }); try{ localStorage.setItem("dd_memo_mode",m); }catch(e){} };
     Array.prototype.forEach.call(document.querySelectorAll("[data-memo-mode]"),function(b){ b.addEventListener("click",function(){ setMode(b.getAttribute("data-memo-mode")); }); });
     var m0="split"; try{ m0=localStorage.getItem("dd_memo_mode")||"split"; }catch(e){} if(m0==="view") m0="split"; setMode(m0);
+    showGraph(); // 첫 화면 = 노트 그래프
   }
 
   /* ===== 데이터 백업 / 복원 ===== */
