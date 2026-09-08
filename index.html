@@ -329,6 +329,22 @@
   .plan-row .pr-do{font-size:11px;color:var(--muted);padding-left:60px;line-height:1.4;}
   .plan-row.done{opacity:.5;} .plan-row.done .pr-u{text-decoration:line-through;}
   @media (max-width:480px){ .plan-row .pr-line{grid-template-columns:46px 58px auto;} .plan-row .pr-u{grid-column:2 / -1;} .plan-row .pr-do{padding-left:0;} }
+  /* 종합 주차별 계획표(정적) */
+  .mplan{display:flex;flex-direction:column;gap:16px;}
+  .mp-wk{border:1px solid var(--line);border-radius:var(--radius-sm,10px);overflow:hidden;}
+  .mp-whead{padding:10px 13px;background:var(--surface-2);border-bottom:1px solid var(--line);}
+  .mp-wtop{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap;}
+  .mp-wn{font-weight:700;font-size:13.5px;color:var(--accent-ink);}
+  .mp-wrange{font-family:var(--mono);font-size:11.5px;color:var(--muted);}
+  .mp-wgoal{margin-top:4px;font-size:12px;color:var(--ink-2);line-height:1.45;}
+  .mp-rows{display:flex;flex-direction:column;}
+  .mp-row{display:grid;grid-template-columns:78px 1fr;gap:10px;align-items:baseline;padding:9px 13px;border-top:1px solid var(--line);}
+  .mp-row:first-child{border-top:none;}
+  .mp-date{display:flex;align-items:baseline;gap:6px;font-family:var(--mono);}
+  .mp-md{font-size:12.5px;font-weight:600;color:var(--ink-2);}
+  .mp-wd{font-size:11px;color:var(--muted);} .mp-wd.sun{color:var(--sun);} .mp-wd.sat{color:var(--sat);}
+  .mp-task{font-size:12.5px;color:var(--ink);line-height:1.5;}
+  @media (max-width:480px){ .mp-row{grid-template-columns:64px 1fr;gap:8px;padding:9px 11px;} }
   @media (max-width:860px){ .stats{grid-template-columns:repeat(2,1fr);} .home-grid{grid-template-columns:1fr;} }
   @media (max-width:480px){ .wrap{padding:14px 12px 90px;} .nav button{padding:8px 11px;font-size:12.5px;} .cal-cell{min-height:46px;} .day{grid-template-columns:60px 1fr;} .pomo{right:12px;left:12px;width:auto;} }
 </style>
@@ -407,6 +423,85 @@
     <div class="stats" id="stats"></div>
     <div id="scopeMgr" style="margin-bottom:18px"></div>
     <div class="col">
+      <section class="panel">
+        <div class="panel-head"><h2>학습 계획 · 주차별 계획표</h2><span class="count">9/21–10/22 · 5주</span></div>
+        <div class="panel-body">
+          <div class="mplan">
+            <div class="mp-wk">
+              <div class="mp-whead">
+                <div class="mp-wtop"><span class="mp-wn">1주차</span><span class="mp-wrange">9/21–9/27</span></div>
+                <div class="mp-wgoal">주간 목표: 전 과목 1~3주차 학습 및 주차별 핵심 요약 작성</div>
+              </div>
+              <div class="mp-rows">
+                <div class="mp-row"><div class="mp-date"><span class="mp-md">9/21</span><span class="mp-wd">월</span></div><div class="mp-task">AI보안 1주차 + 데이터통신 1주차</div></div>
+                <div class="mp-row"><div class="mp-date"><span class="mp-md">9/22</span><span class="mp-wd">화</span></div><div class="mp-task">AI보안 당일 복습 + OS 1주차</div></div>
+                <div class="mp-row"><div class="mp-date"><span class="mp-md">9/23</span><span class="mp-wd">수</span></div><div class="mp-task">데이터통신 당일 복습 + 생명정보과학 1주차</div></div>
+                <div class="mp-row"><div class="mp-date"><span class="mp-md">9/24</span><span class="mp-wd">목</span></div><div class="mp-task">OS 2주차 + AI보안 1주차 복습</div></div>
+                <div class="mp-row"><div class="mp-date"><span class="mp-md">9/25</span><span class="mp-wd">금</span></div><div class="mp-task">AI보안·데이터통신·생명정보과학 각 2주차</div></div>
+                <div class="mp-row"><div class="mp-date"><span class="mp-md">9/26</span><span class="mp-wd sat">토</span></div><div class="mp-task">OS 1~2주차 문제풀이 + AI보안·데이터통신 각 3주차</div></div>
+                <div class="mp-row"><div class="mp-date"><span class="mp-md">9/27</span><span class="mp-wd sun">일</span></div><div class="mp-task">생명정보과학 3주차 + 네 과목 1~3주차 누적복습·오답 정리</div></div>
+              </div>
+            </div>
+            <div class="mp-wk">
+              <div class="mp-whead">
+                <div class="mp-wtop"><span class="mp-wn">2주차</span><span class="mp-wrange">9/28–10/4</span></div>
+                <div class="mp-wgoal">주간 목표: 전 과목 4~6주차 학습, AI보안 1~6주차 누적복습 시작</div>
+              </div>
+              <div class="mp-rows">
+                <div class="mp-row"><div class="mp-date"><span class="mp-md">9/28</span><span class="mp-wd">월</span></div><div class="mp-task">데이터통신 4주차 + AI보안 4주차</div></div>
+                <div class="mp-row"><div class="mp-date"><span class="mp-md">9/29</span><span class="mp-wd">화</span></div><div class="mp-task">AI보안 당일 복습 + OS 3주차</div></div>
+                <div class="mp-row"><div class="mp-date"><span class="mp-md">9/30</span><span class="mp-wd">수</span></div><div class="mp-task">생명정보과학 4주차 + 데이터통신 1~4주차 취약 개념 정리</div></div>
+                <div class="mp-row"><div class="mp-date"><span class="mp-md">10/1</span><span class="mp-wd">목</span></div><div class="mp-task">OS 4주차 + AI보안 1~4주차 암기 확인</div></div>
+                <div class="mp-row"><div class="mp-date"><span class="mp-md">10/2</span><span class="mp-wd">금</span></div><div class="mp-task">AI보안·데이터통신·생명정보과학 각 5주차</div></div>
+                <div class="mp-row"><div class="mp-date"><span class="mp-md">10/3</span><span class="mp-wd sat">토</span></div><div class="mp-task">OS 5주차 + AI보안·데이터통신 각 6주차</div></div>
+                <div class="mp-row"><div class="mp-date"><span class="mp-md">10/4</span><span class="mp-wd sun">일</span></div><div class="mp-task">생명정보과학 6주차 + AI보안 1~6주차 테스트 + 데이터통신·OS 누적복습</div></div>
+              </div>
+            </div>
+            <div class="mp-wk">
+              <div class="mp-whead">
+                <div class="mp-wtop"><span class="mp-wn">3주차</span><span class="mp-wrange">10/5–10/11</span></div>
+                <div class="mp-wgoal">주간 목표: 네 과목 모두 7주차까지 1회독 완료, AI보안 모의시험 2회 실시</div>
+              </div>
+              <div class="mp-rows">
+                <div class="mp-row"><div class="mp-date"><span class="mp-md">10/5</span><span class="mp-wd">월</span></div><div class="mp-task">데이터통신 7주차 + AI보안 1~3주차 복습</div></div>
+                <div class="mp-row"><div class="mp-date"><span class="mp-md">10/6</span><span class="mp-wd">화</span></div><div class="mp-task">AI보안 7주차·당일 복습 + OS 6주차</div></div>
+                <div class="mp-row"><div class="mp-date"><span class="mp-md">10/7</span><span class="mp-wd">수</span></div><div class="mp-task">생명정보과학 7주차 + 데이터통신 전체 목차 회상</div></div>
+                <div class="mp-row"><div class="mp-date"><span class="mp-md">10/8</span><span class="mp-wd">목</span></div><div class="mp-task">OS 7주차 + AI보안 4~7주차 복습</div></div>
+                <div class="mp-row"><div class="mp-date"><span class="mp-md">10/9</span><span class="mp-wd">금</span></div><div class="mp-task">AI보안 1차 모의시험·오답 + 데이터통신·OS 전체 복습</div></div>
+                <div class="mp-row"><div class="mp-date"><span class="mp-md">10/10</span><span class="mp-wd sat">토</span></div><div class="mp-task">AI보안 취약 단원 보완 + 데이터통신 문제풀이 + 생명정보과학 누적복습</div></div>
+                <div class="mp-row"><div class="mp-date"><span class="mp-md">10/11</span><span class="mp-wd sun">일</span></div><div class="mp-task">AI보안 2차 모의시험·오답 + OS 문제풀이 + 생명정보과학 암기 확인</div></div>
+              </div>
+            </div>
+            <div class="mp-wk">
+              <div class="mp-whead">
+                <div class="mp-wtop"><span class="mp-wn">4주차</span><span class="mp-wrange">10/12–10/18</span></div>
+                <div class="mp-wgoal">주간 목표: AI보안 시험 완료, 데이터통신·OS 문제풀이 단계 진입, 생명정보과학 진도 유지</div>
+              </div>
+              <div class="mp-rows">
+                <div class="mp-row"><div class="mp-date"><span class="mp-md">10/12</span><span class="mp-wd">월</span></div><div class="mp-task">AI보안 최종 요약 1회독 + 기존 오답 전부 확인</div></div>
+                <div class="mp-row"><div class="mp-date"><span class="mp-md">10/13</span><span class="mp-wd">화</span></div><div class="mp-task">AI보안 시험 / 시험 후 데이터통신·OS 각 핵심 개념 가볍게 복습</div></div>
+                <div class="mp-row"><div class="mp-date"><span class="mp-md">10/14</span><span class="mp-wd">수</span></div><div class="mp-task">데이터통신 공식·계층별 기능 복습 + 생명정보과학 암기 확인</div></div>
+                <div class="mp-row"><div class="mp-date"><span class="mp-md">10/15</span><span class="mp-wd">목</span></div><div class="mp-task">데이터통신 취약 단원 1개 + OS 1~7주차 핵심 개념</div></div>
+                <div class="mp-row"><div class="mp-date"><span class="mp-md">10/16</span><span class="mp-wd">금</span></div><div class="mp-task">데이터통신 1차 모의시험·오답 + OS 문제풀이</div></div>
+                <div class="mp-row"><div class="mp-date"><span class="mp-md">10/17</span><span class="mp-wd sat">토</span></div><div class="mp-task">데이터통신 취약 문제 재풀이 + OS 1차 모의시험 + 생명정보과학 누적 테스트</div></div>
+                <div class="mp-row"><div class="mp-date"><span class="mp-md">10/18</span><span class="mp-wd sun">일</span></div><div class="mp-task">데이터통신 2차 모의시험 + OS 취약 단원 보완 + 생명정보과학 전체 복습</div></div>
+              </div>
+            </div>
+            <div class="mp-wk">
+              <div class="mp-whead">
+                <div class="mp-wtop"><span class="mp-wn">5주차</span><span class="mp-wrange">10/19–10/22</span></div>
+                <div class="mp-wgoal">주간 목표: 데이터통신·OS 최종 정리 및 시험 완료</div>
+              </div>
+              <div class="mp-rows">
+                <div class="mp-row"><div class="mp-date"><span class="mp-md">10/19</span><span class="mp-wd">월</span></div><div class="mp-task">데이터통신 전체 백지복습 + 오답 재풀이</div></div>
+                <div class="mp-row"><div class="mp-date"><span class="mp-md">10/20</span><span class="mp-wd">화</span></div><div class="mp-task">데이터통신 최종 요약·예상문제 + OS 핵심 개념 복습</div></div>
+                <div class="mp-row"><div class="mp-date"><span class="mp-md">10/21</span><span class="mp-wd">수</span></div><div class="mp-task">데이터통신과네트워크 시험 / 시험 후 OS 최종 요약·오답 확인</div></div>
+                <div class="mp-row"><div class="mp-date"><span class="mp-md">10/22</span><span class="mp-wd">목</span></div><div class="mp-task">OS 시험 / 시험 후 생명정보과학 1~7주차 취약 부분 정리</div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
       <section class="panel">
         <div class="panel-head"><h2>시험 과목 · 학습 계획</h2><span class="count" id="subjCount"></span></div>
         <div class="panel-body"><div class="subj-list" id="subjects"></div></div>
