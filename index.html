@@ -1684,7 +1684,7 @@
     closeList();
     return html||'<p class="memo-empty">여기에 마크다운 미리보기가 표시됩니다.</p>';
   }
-  var activeNote=null, memoInited=false;
+  var activeNote=null, memoInited=false, memoView="graph";
   function loadNotes(){ try{ return JSON.parse(localStorage.getItem("dd_notes")||"{}")||{}; }catch(e){ return {}; } }
   function saveNotes(o){ try{ localStorage.setItem("dd_notes",JSON.stringify(o)); }catch(e){} }
   function noteTitleOf(n){ if(n&&n.title&&n.title.trim()) return n.title.trim(); var b=(n&&n.body)||""; var m=b.match(/^#{1,6}\s+(.+)$/m); if(m) return m[1].trim().slice(0,60); var lines=b.split("\n"); for(var i=0;i<lines.length;i++){ if(lines[i].trim()) return lines[i].trim().slice(0,60); } return "제목 없음"; }
@@ -1740,8 +1740,8 @@
     }).join("");
     host.innerHTML=svg+nodes;
   }
-  function showGraph(){ renderGraph(); if($("memoGraph")) $("memoGraph").hidden=false; if($("memo2")) $("memo2").hidden=true; if($("memoRead")) $("memoRead").hidden=true; }
-  function showEditor(){ if($("memoGraph")) $("memoGraph").hidden=true; if($("memo2")) $("memo2").hidden=false; if($("memoRead")) $("memoRead").hidden=true; }
+  function showGraph(){ renderGraph(); if($("memoGraph")) $("memoGraph").hidden=false; if($("memo2")) $("memo2").hidden=true; if($("memoRead")) $("memoRead").hidden=true; memoView="graph"; }
+  function showEditor(){ if($("memoGraph")) $("memoGraph").hidden=true; if($("memo2")) $("memo2").hidden=false; if($("memoRead")) $("memoRead").hidden=true; memoView="editor"; }
   function initMemo(){
     if(memoInited) return;
     var wrap=$("memoWrap"), edit=$("memoEdit"), titleI=$("noteTitle"); if(!wrap||!edit) return; memoInited=true;
@@ -1752,7 +1752,9 @@
     openNote(activeNote);
     edit.addEventListener("input",function(){ saveActiveNote(); memoDraw(); renderNoteList(); });
     if(titleI) titleI.addEventListener("input",function(){ saveActiveNote(); renderNoteList(); });
-    var onNoteClick=function(e){ var b=e.target.closest("[data-note]"); if(b){ openNote(b.getAttribute("data-note")); showEditor(); } };
+    var onNoteClick=function(e){ var b=e.target.closest("[data-note]"); if(!b) return; var id=b.getAttribute("data-note");
+      if(memoView==="editor" && id===activeNote){ showGraph(); return; }   // 같은 노트 재클릭 → 그래프로
+      openNote(id); showEditor(); };
     $("noteList").addEventListener("click",onNoteClick);
     $("graphNoteList").addEventListener("click",onNoteClick);
     $("noteNew").addEventListener("click",function(){ newNote(); showEditor(); });
@@ -1763,9 +1765,9 @@
       var rest=noteOrder(ns);
       if(rest.length) openNote(rest[0]); else newNote();
     });
-    $("notePublish").addEventListener("click",function(){ var n=currentNote(); if(!n) return; $("readTitle").textContent=noteTitleOf(n); $("readBody").innerHTML=mdToHtml(n.body); $("memoGraph").hidden=true; $("memo2").hidden=true; $("memoRead").hidden=false; });
+    $("notePublish").addEventListener("click",function(){ var n=currentNote(); if(!n) return; $("readTitle").textContent=noteTitleOf(n); $("readBody").innerHTML=mdToHtml(n.body); $("memoGraph").hidden=true; $("memo2").hidden=true; $("memoRead").hidden=false; memoView="read"; });
     $("readBack").addEventListener("click",function(){ showEditor(); });
-    $("graphCanvas").addEventListener("click",function(e){ var b=e.target.closest("[data-note]"); if(b){ openNote(b.getAttribute("data-note")); showEditor(); } });
+    $("graphCanvas").addEventListener("click",onNoteClick);
     $("graphNew").addEventListener("click",function(){ newNote(); showEditor(); });
     $("toGraph").addEventListener("click",showGraph);
     var setMode=function(m){ wrap.className="memo-wrap mode-"+m; Array.prototype.forEach.call(document.querySelectorAll("[data-memo-mode]"),function(b){ b.classList.toggle("on",b.getAttribute("data-memo-mode")===m); }); try{ localStorage.setItem("dd_memo_mode",m); }catch(e){} };
