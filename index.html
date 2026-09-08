@@ -366,9 +366,14 @@
   .mp-row.mp-today{background:var(--accent-soft);}
   .mp-row.mp-today .mp-md{color:var(--accent-ink);font-weight:700;}
   /* Memo (옵시디언식 마크다운) */
+  .memo-graph{display:grid;grid-template-columns:236px 1fr;gap:16px;align-items:start;}
+  .graph-main{min-width:0;}
   .graph-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
   .graph-top h2{font-size:15px;}
-  .graph-canvas{position:relative;height:72vh;background:radial-gradient(circle at 50% 42%, var(--surface) 0%, var(--surface-2) 100%);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow-sm);}
+  .graph-canvas{position:relative;height:56vh;background:radial-gradient(circle at 50% 42%, var(--surface) 0%, var(--surface-2) 100%);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow-sm);}
+  .graph-edges{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0;}
+  .graph-edges line{stroke:var(--accent);}
+  .graph-node{z-index:1;}
   .graph-node{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:6px;background:none;border:none;cursor:pointer;padding:0;}
   .gn-dot{width:20px;height:20px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 4px var(--accent-soft),0 2px 8px rgba(0,0,0,.15);transition:background .15s,box-shadow .15s;animation:gnFloat 5s ease-in-out infinite alternate;}
   .graph-node:hover .gn-dot{background:var(--accent-ink);box-shadow:0 0 0 7px var(--accent-soft),0 5px 16px rgba(0,0,0,.28);}
@@ -415,7 +420,7 @@
   .markdown a{color:var(--accent);text-decoration:underline;}
   .markdown del{color:var(--muted);}
   .memo-empty{color:var(--muted);font-style:italic;}
-  @media(max-width:700px){ .memo2{grid-template-columns:1fr;} .memo-side{position:static;} .note-list{max-height:220px;} .memo-wrap{grid-template-columns:1fr;} .memo-edit{border-right:none;border-bottom:1px solid var(--line);min-height:40vh;} .memo-wrap:not(.mode-edit):not(.mode-view) .memo-view{min-height:30vh;} .memo-read-body{padding:22px 18px;} }
+  @media(max-width:700px){ .memo2,.memo-graph{grid-template-columns:1fr;} .memo-side{position:static;} .note-list{max-height:220px;} .graph-canvas{height:46vh;} .memo-wrap{grid-template-columns:1fr;} .memo-edit{border-right:none;border-bottom:1px solid var(--line);min-height:40vh;} .memo-wrap:not(.mode-edit):not(.mode-view) .memo-view{min-height:30vh;} .memo-read-body{padding:22px 18px;} }
   @media (max-width:480px){ .mp-row{grid-template-columns:20px 60px 1fr;gap:8px;padding:9px 11px;} }
   @media (max-width:860px){ .stats{grid-template-columns:repeat(2,1fr);} .home-grid{grid-template-columns:1fr;} }
   @media (max-width:480px){ .wrap{padding:14px 12px 90px;} .nav button{padding:8px 11px;font-size:12.5px;} .cal-cell{min-height:46px;} .day{grid-template-columns:60px 1fr;} .pomo{right:12px;left:12px;width:auto;} }
@@ -591,13 +596,19 @@
   <!-- MEMO -->
   <div class="tabpane" id="tab-memo" hidden>
     <div class="memo-graph" id="memoGraph">
-      <div class="graph-top"><h2>노트 그래프 <span class="hint" style="font-weight:400;color:var(--muted)">점을 눌러 편집</span></h2><button class="btn primary" id="graphNew" style="padding:6px 11px"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>새 노트</button></div>
-      <div class="graph-canvas" id="graphCanvas"></div>
+      <aside class="memo-side">
+        <div class="memo-side-top"><span>노트</span><button class="btn primary" id="graphNew" style="padding:5px 9px;font-size:12px">+ 새 노트</button></div>
+        <div class="note-list js-note-list" id="graphNoteList"></div>
+      </aside>
+      <div class="graph-main">
+        <div class="graph-top"><h2>노트 그래프 <span class="hint" style="font-weight:400;color:var(--muted)">비슷한 내용은 자동 연결 · 점을 눌러 편집</span></h2></div>
+        <div class="graph-canvas" id="graphCanvas"></div>
+      </div>
     </div>
     <div class="memo2" id="memo2" hidden>
       <aside class="memo-side">
         <div class="memo-side-top"><span>노트</span><button class="btn primary" id="noteNew" style="padding:5px 9px;font-size:12px">+ 새 노트</button></div>
-        <div class="note-list" id="noteList"></div>
+        <div class="note-list js-note-list" id="noteList"></div>
       </aside>
       <section class="panel memo-main">
         <div class="panel-head">
@@ -1680,12 +1691,13 @@
   function currentNote(){ return loadNotes()[activeNote]; }
   function memoDraw(){ var n=currentNote(), view=$("memoView"); if(view) view.innerHTML=mdToHtml(n?n.body:""); }
   function renderNoteList(){
-    var ns=loadNotes(), host=$("noteList"); if(!host) return;
-    var ids=noteOrder(ns);
-    host.innerHTML=ids.length?ids.map(function(id){ var n=ns[id]; var t=noteTitleOf(n);
+    var hosts=document.querySelectorAll(".js-note-list"); if(!hosts.length) return;
+    var ns=loadNotes(), ids=noteOrder(ns);
+    var html=ids.length?ids.map(function(id){ var n=ns[id]; var t=noteTitleOf(n);
       var prev=(n.body||"").replace(/[#>*`~\[\]()]/g,"").replace(/\s+/g," ").trim().slice(0,44);
       return '<button class="note-item'+(id===activeNote?" on":"")+'" data-note="'+id+'"><div class="note-item-t">'+esc(t)+'</div><div class="note-item-p">'+esc(prev||"내용 없음")+'</div></button>';
     }).join(""):'<div class="panel-empty" style="padding:16px 14px">노트가 없어요.<br>‘+ 새 노트’로 시작하세요.</div>';
+    Array.prototype.forEach.call(hosts,function(h){ h.innerHTML=html; });
   }
   function openNote(id){
     var ns=loadNotes(); if(!ns[id]) return; activeNote=id; try{ localStorage.setItem("dd_note_active",id); }catch(e){}
@@ -1694,17 +1706,38 @@
   }
   function newNote(){ var ns=loadNotes(), id=makeId(); ns[id]={id:id,title:"",body:"",updated:Date.now()}; saveNotes(ns); openNote(id); if($("noteTitle")) $("noteTitle").focus(); }
   function saveActiveNote(){ var ns=loadNotes(), n=ns[activeNote]; if(!n) return; n.title=$("noteTitle")?$("noteTitle").value:n.title; n.body=$("memoEdit")?$("memoEdit").value:n.body; n.updated=Date.now(); saveNotes(ns); }
+  // 노트 내용 → 특징벡터(단어 + 한글/단어 2-gram) : 유사도로 자동 선 연결에 사용
+  function noteVec(text){
+    var t=String(text||"").toLowerCase().replace(/[`*_>#~\-\[\]()!.,:;"'\/]/g," ");
+    var toks=t.match(/[0-9a-z가-힣]+/g)||[], v={};
+    toks.forEach(function(w){ if(w.length<2) return; v[w]=(v[w]||0)+1; for(var i=0;i<w.length-1;i++){ var g="#"+w.substr(i,2); v[g]=(v[g]||0)+0.5; } });
+    return v;
+  }
+  function cosineSim(a,b){ var dot=0,na=0,nb=0,k; for(k in a){ na+=a[k]*a[k]; if(b[k]!=null) dot+=a[k]*b[k]; } for(k in b){ nb+=b[k]*b[k]; } return (na&&nb)?dot/(Math.sqrt(na)*Math.sqrt(nb)):0; }
+  function noteEdges(ids,ns){
+    var THRESH=0.16, MAXDEG=3, vecs=ids.map(function(id){ return noteVec((ns[id].title||"")+" "+(ns[id].body||"")); });
+    var pairs=[];
+    for(var i=0;i<ids.length;i++) for(var j=i+1;j<ids.length;j++){ var s=cosineSim(vecs[i],vecs[j]); if(s>=THRESH) pairs.push({i:i,j:j,s:s}); }
+    pairs.sort(function(a,b){ return b.s-a.s; });
+    var deg={}, edges=[];
+    pairs.forEach(function(p){ if((deg[p.i]||0)<MAXDEG && (deg[p.j]||0)<MAXDEG){ edges.push(p); deg[p.i]=(deg[p.i]||0)+1; deg[p.j]=(deg[p.j]||0)+1; } });
+    return edges;
+  }
   function renderGraph(){
     var host=$("graphCanvas"); if(!host) return;
     var ns=loadNotes(), ids=noteOrder(ns);
     if(!ids.length){ host.innerHTML='<div class="graph-empty">아직 노트가 없어요.<br>‘+ 새 노트’로 첫 노트를 만들어 보세요.</div>'; return; }
     var GA=2.399963229, n=ids.length, maxR=Math.sqrt(Math.max(0,n-1));
-    host.innerHTML=ids.map(function(id,i){
-      var n0=ns[id], ang=i*GA, rn=maxR?Math.sqrt(i)/maxR:0;
-      var x=50+rn*42*Math.cos(ang), y=50+rn*40*Math.sin(ang);
+    var pos=ids.map(function(id,i){ var ang=i*GA, rn=maxR?Math.sqrt(i)/maxR:0; return {x:50+rn*42*Math.cos(ang), y:50+rn*40*Math.sin(ang)}; });
+    var edges=noteEdges(ids,ns);
+    var svg='<svg class="graph-edges" preserveAspectRatio="none">'+edges.map(function(e){ var a=pos[e.i],b=pos[e.j];
+      return '<line x1="'+a.x.toFixed(1)+'%" y1="'+a.y.toFixed(1)+'%" x2="'+b.x.toFixed(1)+'%" y2="'+b.y.toFixed(1)+'%" stroke-width="'+(1+e.s*2.5).toFixed(2)+'" style="stroke-opacity:'+(0.18+e.s*0.55).toFixed(2)+'"/>';
+    }).join("")+'</svg>';
+    var nodes=ids.map(function(id,i){ var n0=ns[id];
       var sz=Math.max(16,Math.min(46,16+(n0.body||"").length/40));
-      return '<button class="graph-node" data-note="'+id+'" style="left:'+x.toFixed(1)+'%;top:'+y.toFixed(1)+'%"><span class="gn-dot" style="width:'+sz.toFixed(0)+'px;height:'+sz.toFixed(0)+'px;animation-delay:'+(i*0.3).toFixed(1)+'s"></span><span class="gn-label">'+esc(noteTitleOf(n0))+'</span></button>';
+      return '<button class="graph-node" data-note="'+id+'" style="left:'+pos[i].x.toFixed(1)+'%;top:'+pos[i].y.toFixed(1)+'%"><span class="gn-dot" style="width:'+sz.toFixed(0)+'px;height:'+sz.toFixed(0)+'px;animation-delay:'+(i*0.3).toFixed(1)+'s"></span><span class="gn-label">'+esc(noteTitleOf(n0))+'</span></button>';
     }).join("");
+    host.innerHTML=svg+nodes;
   }
   function showGraph(){ renderGraph(); if($("memoGraph")) $("memoGraph").hidden=false; if($("memo2")) $("memo2").hidden=true; if($("memoRead")) $("memoRead").hidden=true; }
   function showEditor(){ if($("memoGraph")) $("memoGraph").hidden=true; if($("memo2")) $("memo2").hidden=false; if($("memoRead")) $("memoRead").hidden=true; }
@@ -1718,8 +1751,10 @@
     openNote(activeNote);
     edit.addEventListener("input",function(){ saveActiveNote(); memoDraw(); renderNoteList(); });
     if(titleI) titleI.addEventListener("input",function(){ saveActiveNote(); renderNoteList(); });
-    $("noteList").addEventListener("click",function(e){ var b=e.target.closest("[data-note]"); if(b) openNote(b.getAttribute("data-note")); });
-    $("noteNew").addEventListener("click",newNote);
+    var onNoteClick=function(e){ var b=e.target.closest("[data-note]"); if(b){ openNote(b.getAttribute("data-note")); showEditor(); } };
+    $("noteList").addEventListener("click",onNoteClick);
+    $("graphNoteList").addEventListener("click",onNoteClick);
+    $("noteNew").addEventListener("click",function(){ newNote(); showEditor(); });
     $("noteDelete").addEventListener("click",function(){
       var ns=loadNotes(); if(!ns[activeNote]) return;
       if(!confirm("이 노트를 삭제할까요?\n\n“"+noteTitleOf(ns[activeNote])+"”")) return;
