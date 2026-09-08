@@ -365,6 +365,32 @@
   .mp-prog-txt{font-family:var(--mono);font-size:11.5px;color:var(--muted);white-space:nowrap;}
   .mp-row.mp-today{background:var(--accent-soft);}
   .mp-row.mp-today .mp-md{color:var(--accent-ink);font-weight:700;}
+  /* Memo (옵시디언식 마크다운) */
+  .memo-modes{display:flex;gap:4px;}
+  .memo-modes .btn{padding:5px 10px;font-size:12px;}
+  .memo-modes .btn.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent-ink);}
+  .memo-wrap{display:grid;grid-template-columns:1fr 1fr;min-height:65vh;}
+  .memo-wrap.mode-edit{grid-template-columns:1fr;} .memo-wrap.mode-edit .memo-view{display:none;}
+  .memo-wrap.mode-view{grid-template-columns:1fr;} .memo-wrap.mode-view .memo-edit{display:none;}
+  .memo-edit{border:none;border-right:1px solid var(--line);border-radius:0;padding:18px 20px;font-family:var(--mono);font-size:13.5px;line-height:1.65;resize:none;outline:none;background:var(--surface);color:var(--ink);min-height:65vh;box-sizing:border-box;}
+  .memo-wrap.mode-edit .memo-edit,.memo-wrap.mode-view .memo-view{border-right:none;}
+  .memo-view{padding:14px 22px;overflow:auto;min-height:65vh;box-sizing:border-box;}
+  .markdown{font-size:14px;line-height:1.65;color:var(--ink);word-break:break-word;}
+  .markdown h1,.markdown h2,.markdown h3,.markdown h4,.markdown h5,.markdown h6{margin:1.1em 0 .5em;line-height:1.3;font-weight:700;}
+  .markdown h1{font-size:1.6em;border-bottom:1px solid var(--line);padding-bottom:.25em;}
+  .markdown h2{font-size:1.35em;border-bottom:1px solid var(--line);padding-bottom:.2em;}
+  .markdown h3{font-size:1.15em;} .markdown h4{font-size:1em;}
+  .markdown p{margin:.5em 0;} .markdown ul,.markdown ol{margin:.4em 0;padding-left:1.5em;} .markdown li{margin:.2em 0;}
+  .markdown li.task{list-style:none;margin-left:-1.2em;} .markdown li.task input{margin-right:6px;}
+  .markdown code{font-family:var(--mono);font-size:.88em;background:var(--surface-2);border:1px solid var(--line);border-radius:4px;padding:1px 5px;}
+  .markdown pre{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow:auto;margin:.6em 0;}
+  .markdown pre code{background:none;border:none;padding:0;font-size:.85em;}
+  .markdown blockquote{margin:.6em 0;padding:.2em 0 .2em 14px;border-left:3px solid var(--accent);color:var(--ink-2);background:var(--accent-soft);border-radius:0 6px 6px 0;}
+  .markdown hr{border:none;border-top:1px solid var(--line-strong);margin:1em 0;}
+  .markdown a{color:var(--accent);text-decoration:underline;}
+  .markdown del{color:var(--muted);}
+  .memo-empty{color:var(--muted);font-style:italic;}
+  @media(max-width:700px){ .memo-wrap{grid-template-columns:1fr;} .memo-edit{border-right:none;border-bottom:1px solid var(--line);min-height:40vh;} .memo-wrap:not(.mode-edit):not(.mode-view) .memo-view{min-height:30vh;} }
   @media (max-width:480px){ .mp-row{grid-template-columns:20px 60px 1fr;gap:8px;padding:9px 11px;} }
   @media (max-width:860px){ .stats{grid-template-columns:repeat(2,1fr);} .home-grid{grid-template-columns:1fr;} }
   @media (max-width:480px){ .wrap{padding:14px 12px 90px;} .nav button{padding:8px 11px;font-size:12.5px;} .cal-cell{min-height:46px;} .day{grid-template-columns:60px 1fr;} .pomo{right:12px;left:12px;width:auto;} }
@@ -536,6 +562,24 @@
   <div class="tabpane" id="tab-commsec" hidden><div id="pane-commsec"></div></div>
   <div class="tabpane" id="tab-asc" hidden><div id="pane-asc"></div></div>
   <div class="tabpane" id="tab-etc" hidden><div id="pane-etc"></div></div>
+
+  <!-- MEMO -->
+  <div class="tabpane" id="tab-memo" hidden>
+    <section class="panel memo-panel">
+      <div class="panel-head">
+        <h2>Memo <span class="hint" style="font-weight:400;color:var(--muted)">아무 생각이나 자유롭게 · 자동 저장 · 마크다운</span></h2>
+        <div class="memo-modes">
+          <button class="btn" data-memo-mode="split">나란히</button>
+          <button class="btn" data-memo-mode="edit">편집</button>
+          <button class="btn" data-memo-mode="view">미리보기</button>
+        </div>
+      </div>
+      <div class="memo-wrap" id="memoWrap">
+        <textarea class="memo-edit" id="memoEdit" spellcheck="false" placeholder="# 오늘의 생각&#10;&#10;- 마크다운을 지원해요&#10;- **굵게**, *기울임*, `코드`, ~~취소선~~&#10;- &gt; 인용, --- 구분선&#10;- [ ] 할 일 / [x] 완료&#10;- [링크](https://example.com)"></textarea>
+        <div class="memo-view markdown" id="memoView"></div>
+      </div>
+    </section>
+  </div>
 </div>
 
 <!-- Pomodoro -->
@@ -597,7 +641,7 @@
   var CATS=["school","commsec","asc","etc"];
   var CAT={ school:{label:"학교",color:"#4f46e5"}, commsec:{label:"연구실",color:"#0891b2"}, asc:{label:"동아리",color:"#db2777"}, etc:{label:"기타",color:"#79828f"} };
   var TABS=[
-    {id:"home",label:"Home"}, {id:"school",label:"School"}, {id:"commsec",label:"CommSec"}, {id:"asc",label:"ASC"}, {id:"etc",label:"Etc"}
+    {id:"home",label:"Home"}, {id:"school",label:"School"}, {id:"commsec",label:"CommSec"}, {id:"asc",label:"ASC"}, {id:"etc",label:"Etc"}, {id:"memo",label:"Memo"}
   ];
   // 대한민국 공휴일: 매년 고정 + 연도별(음력·대체) 표(2025~2026 내장, 이후 확장 가능)
   var HOLIDAY_FIXED={ "01-01":"신정","03-01":"삼일절","05-05":"어린이날","06-06":"현충일","08-15":"광복절","10-03":"개천절","10-09":"한글날","12-25":"성탄절" };
@@ -1066,7 +1110,7 @@
   /* ===== 상태 ===== */
   var cal={y:0,m:0}, selKey=null, activeTab="home", dayModalKey=null;
   try{ activeTab=localStorage.getItem("dd_tab")||"home"; }catch(e){}
-  if (["home","school","commsec","asc","etc"].indexOf(activeTab)<0) activeTab="home";
+  if (["home","school","commsec","asc","etc","memo"].indexOf(activeTab)<0) activeTab="home";
 
   function render(){
     var tKey=todayKey(), d=new Date();
@@ -1093,6 +1137,7 @@
     renderCatPane("commsec",tKey); renderCatPane("asc",tKey); renderCatPane("etc",tKey);
     renderAllCalendars();
     enhanceMasterPlan();
+    initMemo();
     fillPomoSubjects();
     applyTab();
     paintNotifBtn();
@@ -1367,7 +1412,7 @@
 
   /* ===== 탭 ===== */
   function applyTab(){
-    ["home","school","commsec","asc","etc"].forEach(function(t){ $("tab-"+t).hidden=(t!==activeTab); });
+    ["home","school","commsec","asc","etc","memo"].forEach(function(t){ $("tab-"+t).hidden=(t!==activeTab); });
     Array.prototype.forEach.call($("nav").querySelectorAll("button"),function(b){ b.classList.toggle("active",b.getAttribute("data-tab")===activeTab); });
   }
   $("nav").addEventListener("click",function(e){ var b=e.target.closest("[data-tab]"); if(!b)return; activeTab=b.getAttribute("data-tab"); try{localStorage.setItem("dd_tab",activeTab);}catch(err){} applyTab(); });
@@ -1409,7 +1454,7 @@
   document.addEventListener("keydown",function(e){ if(e.key==="Escape") closeModal(); });
 
   /* ===== 날짜 상세 팝업 (모든 캘린더 공용) ===== */
-  function tabFilter(){ return activeTab==="home"?null:activeTab; }
+  function tabFilter(){ return (activeTab==="home"||activeTab==="memo")?null:activeTab; }
   function dayItems(key,filter,tKey){ var s=daySlot(key,tKey); var showExam=(filter===null||filter==="school"), showStudy=(filter===null||filter==="school");
     return { exams:showExam?s.exams:[], study:showStudy?s.study:[], dues:s.dues.filter(function(d){return filter===null||((d.t.cat||"etc")===filter);}), master:(filter===null||filter==="school")?masterPlanOn(key):null }; }
   function dayItemCount(it){ return it.exams.length+it.dues.length+it.study.length+(it.master?1:0); }
@@ -1551,8 +1596,57 @@
   try{ var sv=localStorage.getItem("exam_theme"); if(sv) document.documentElement.setAttribute("data-theme",sv); }catch(e){}
   themeBtn.addEventListener("click",function(){ var cur=document.documentElement.getAttribute("data-theme"); var dark=cur?cur==="dark":window.matchMedia("(prefers-color-scheme: dark)").matches; var next=dark?"light":"dark"; document.documentElement.setAttribute("data-theme",next); try{localStorage.setItem("exam_theme",next);}catch(e){} });
 
+  /* ===== Memo (마크다운) ===== */
+  function mdEscape(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+  function mdInline(s){
+    s=s.replace(/`([^`]+)`/g,function(m,c){return "<code>"+c+"</code>";});
+    s=s.replace(/\*\*([^*]+)\*\*/g,"<strong>$1</strong>");
+    s=s.replace(/(^|[^*])\*([^*\n]+)\*/g,"$1<em>$2</em>");
+    s=s.replace(/~~([^~]+)~~/g,"<del>$1</del>");
+    s=s.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g,'<a href="$2" target="_blank" rel="noopener">$1</a>');
+    return s;
+  }
+  function mdToHtml(src){
+    var lines=String(src||"").replace(/\r\n/g,"\n").split("\n"), html="", inCode=false, codeBuf=[], listType=null, listBuf=[];
+    function closeList(){ if(listType){ html+="<"+listType+">"+listBuf.join("")+"</"+listType+">"; listType=null; listBuf=[]; } }
+    for(var i=0;i<lines.length;i++){
+      var ln=lines[i];
+      if(/^```/.test(ln)){ if(inCode){ html+="<pre><code>"+mdEscape(codeBuf.join("\n"))+"</code></pre>"; inCode=false; codeBuf=[]; } else { closeList(); inCode=true; } continue; }
+      if(inCode){ codeBuf.push(ln); continue; }
+      if(/^\s*$/.test(ln)){ closeList(); continue; }
+      var h=ln.match(/^(#{1,6})\s+(.*)$/);
+      if(h){ closeList(); var lvl=h[1].length; html+="<h"+lvl+">"+mdInline(mdEscape(h[2]))+"</h"+lvl+">"; continue; }
+      if(/^\s*([-*_])(\s*\1){2,}\s*$/.test(ln)){ closeList(); html+="<hr>"; continue; }
+      var q=ln.match(/^>\s?(.*)$/);
+      if(q){ closeList(); html+="<blockquote>"+mdInline(mdEscape(q[1]))+"</blockquote>"; continue; }
+      var task=ln.match(/^\s*[-*]\s+\[([ xX])\]\s+(.*)$/);
+      if(task){ if(listType!=="ul"){ closeList(); listType="ul"; } var ck=task[1].toLowerCase()==="x"; listBuf.push('<li class="task"><input type="checkbox" disabled '+(ck?"checked":"")+"> "+mdInline(mdEscape(task[2]))+"</li>"); continue; }
+      var ul=ln.match(/^\s*[-*]\s+(.*)$/);
+      if(ul){ if(listType!=="ul"){ closeList(); listType="ul"; } listBuf.push("<li>"+mdInline(mdEscape(ul[1]))+"</li>"); continue; }
+      var ol=ln.match(/^\s*\d+\.\s+(.*)$/);
+      if(ol){ if(listType!=="ol"){ closeList(); listType="ol"; } listBuf.push("<li>"+mdInline(mdEscape(ol[1]))+"</li>"); continue; }
+      closeList(); html+="<p>"+mdInline(mdEscape(ln))+"</p>";
+    }
+    if(inCode) html+="<pre><code>"+mdEscape(codeBuf.join("\n"))+"</code></pre>";
+    closeList();
+    return html||'<p class="memo-empty">여기에 마크다운 미리보기가 표시됩니다.</p>';
+  }
+  var memoInited=false;
+  function initMemo(){
+    if(memoInited) return;
+    var edit=$("memoEdit"), view=$("memoView"), wrap=$("memoWrap");
+    if(!edit||!view||!wrap) return; memoInited=true;
+    try{ edit.value=localStorage.getItem("dd_memo")||""; }catch(e){}
+    var draw=function(){ view.innerHTML=mdToHtml(edit.value); };
+    draw();
+    edit.addEventListener("input",function(){ try{ localStorage.setItem("dd_memo",edit.value); }catch(e){} draw(); });
+    var setMode=function(m){ wrap.className="memo-wrap mode-"+m; Array.prototype.forEach.call(document.querySelectorAll("[data-memo-mode]"),function(b){ b.classList.toggle("on",b.getAttribute("data-memo-mode")===m); }); try{ localStorage.setItem("dd_memo_mode",m); }catch(e){} };
+    Array.prototype.forEach.call(document.querySelectorAll("[data-memo-mode]"),function(b){ b.addEventListener("click",function(){ setMode(b.getAttribute("data-memo-mode")); }); });
+    var m0="split"; try{ m0=localStorage.getItem("dd_memo_mode")||"split"; }catch(e){} setMode(m0);
+  }
+
   /* ===== 데이터 백업 / 복원 ===== */
-  var BACKUP_KEYS=["ddesk_v2","dd_mplan_done","dd_mplan_collapsed","dd_timetable","dd_study_start","dd_tab","exam_theme","dd_notify"];
+  var BACKUP_KEYS=["ddesk_v2","dd_mplan_done","dd_mplan_collapsed","dd_timetable","dd_study_start","dd_tab","exam_theme","dd_notify","dd_memo","dd_memo_mode"];
   function exportData(){
     var out={_app:"d-desk",_ver:1,_exportedAt:new Date().toISOString(),data:{}};
     BACKUP_KEYS.forEach(function(k){ try{ var v=localStorage.getItem(k); if(v!=null) out.data[k]=v; }catch(e){} });
