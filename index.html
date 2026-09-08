@@ -918,6 +918,43 @@
     try{ new Notification("오늘 할 일 — "+parts.join(" · "),{body:body,tag:"dd-daily-"+tKey}); localStorage.setItem(NOTIF_DAY_KEY,tKey); }catch(e){}
   }
 
+  // 종합 주차별 계획표(정적) — 학습 계획 패널과 동일 내용을 캘린더/일정에도 표시
+  var MASTER_PLAN={
+    "2026-09-21":"AI보안 1주차 + 데이터통신 1주차",
+    "2026-09-22":"AI보안 당일 복습 + OS 1주차",
+    "2026-09-23":"데이터통신 당일 복습 + 생명정보과학 1주차",
+    "2026-09-24":"OS 2주차 + AI보안 1주차 복습",
+    "2026-09-25":"AI보안·데이터통신·생명정보과학 각 2주차",
+    "2026-09-26":"OS 1~2주차 문제풀이 + AI보안·데이터통신 각 3주차",
+    "2026-09-27":"생명정보과학 3주차 + 네 과목 1~3주차 누적복습·오답 정리",
+    "2026-09-28":"데이터통신 4주차 + AI보안 4주차",
+    "2026-09-29":"AI보안 당일 복습 + OS 3주차",
+    "2026-09-30":"생명정보과학 4주차 + 데이터통신 1~4주차 취약 개념 정리",
+    "2026-10-01":"OS 4주차 + AI보안 1~4주차 암기 확인",
+    "2026-10-02":"AI보안·데이터통신·생명정보과학 각 5주차",
+    "2026-10-03":"OS 5주차 + AI보안·데이터통신 각 6주차",
+    "2026-10-04":"생명정보과학 6주차 + AI보안 1~6주차 테스트 + 데이터통신·OS 누적복습",
+    "2026-10-05":"데이터통신 7주차 + AI보안 1~3주차 복습",
+    "2026-10-06":"AI보안 7주차·당일 복습 + OS 6주차",
+    "2026-10-07":"생명정보과학 7주차 + 데이터통신 전체 목차 회상",
+    "2026-10-08":"OS 7주차 + AI보안 4~7주차 복습",
+    "2026-10-09":"AI보안 1차 모의시험·오답 + 데이터통신·OS 전체 복습",
+    "2026-10-10":"AI보안 취약 단원 보완 + 데이터통신 문제풀이 + 생명정보과학 누적복습",
+    "2026-10-11":"AI보안 2차 모의시험·오답 + OS 문제풀이 + 생명정보과학 암기 확인",
+    "2026-10-12":"AI보안 최종 요약 1회독 + 기존 오답 전부 확인",
+    "2026-10-13":"AI보안 시험 / 시험 후 데이터통신·OS 각 핵심 개념 가볍게 복습",
+    "2026-10-14":"데이터통신 공식·계층별 기능 복습 + 생명정보과학 암기 확인",
+    "2026-10-15":"데이터통신 취약 단원 1개 + OS 1~7주차 핵심 개념",
+    "2026-10-16":"데이터통신 1차 모의시험·오답 + OS 문제풀이",
+    "2026-10-17":"데이터통신 취약 문제 재풀이 + OS 1차 모의시험 + 생명정보과학 누적 테스트",
+    "2026-10-18":"데이터통신 2차 모의시험 + OS 취약 단원 보완 + 생명정보과학 전체 복습",
+    "2026-10-19":"데이터통신 전체 백지복습 + 오답 재풀이",
+    "2026-10-20":"데이터통신 최종 요약·예상문제 + OS 핵심 개념 복습",
+    "2026-10-21":"데이터통신과네트워크 시험 / 시험 후 OS 최종 요약·오답 확인",
+    "2026-10-22":"OS 시험 / 시험 후 생명정보과학 1~7주차 취약 부분 정리"
+  };
+  function masterPlanOn(key){ return MASTER_PLAN[key]||null; }
+
   function daySlot(key, tKey){
     var subs=subjects(), tk=tasks(), o={exams:[],dues:[],study:[]};
     Object.keys(subs).forEach(function(id){ var s=subs[id];
@@ -1032,6 +1069,7 @@
         if(o.isRange){ if(k>=o.start&&k<=o.end && !(laneOf[o.key]<MAXLANE)){ if(o.t.type==="exam")hasExam=true; dotsArr.push('<i class="due" style="background:'+duecol(o.t)+'"></i>'); } }
         else if(o.start===k){ if(o.t.type==="exam")hasExam=true; dotsArr.push('<i class="due" style="background:'+duecol(o.t)+'"></i>'); }
       });
+      if(masterPlanOn(k)) dotsArr.unshift('<i style="background:var(--accent)"></i>');
       var hol=holidayName(k);
       var cls="cal-cell"+(other?" other":"")+(k===tKey?" today":(dow===0?" sun":dow===6?" sat":""))+(k===selKey?" sel":"")+(hasExam?" hasexam":"")+(hol?" holiday":"");
       html+='<button class="'+cls+'" data-action="cal-day" data-key="'+k+'"><span class="cn">'+cd.getDate()+'</span>'+(hol?'<span class="cal-hol">'+esc(hol)+'</span>':'')+(bars?'<span class="cal-bars">'+bars+'</span>':'')+'<span class="cal-dots">'+dotsArr.slice(0,4).join("")+'</span></button>';
@@ -1052,6 +1090,8 @@
     var holD=holidayName(selKey);
     $("dayTitle").textContent=(sd.getMonth()+1)+"월 "+sd.getDate()+"일 ("+WD[sd.getDay()]+")"+(holD?" · "+holD:"");
     var items="";
+    var mp=masterPlanOn(selKey);
+    if(mp) items+='<div class="titem"><span class="dot" style="background:var(--accent)"></span><span class="badge2 cn">계획</span><span class="tx">'+esc(mp)+'</span></div>';
     s.exams.forEach(function(x){ items+='<div class="titem"><span class="dot" style="background:'+subjColor(x)+'"></span><span class="badge2 ex">시험</span><span class="tx">'+esc(x.name)+'</span></div>'; });
     s.dues.forEach(function(d){ var t=d.t, sc=(CAT[t.cat]||CAT.etc).color, done=occDone(t,d.occ), tl=timeLabel(t);
       items+='<div class="titem '+(done?"done":"")+'"><span class="dot" style="background:'+sc+'"></span>'+(t.type==="exam"?'<span class="badge2 ex">시험</span>':'<span class="badge2 du">'+(CAT[t.cat]||CAT.etc).label+'</span>')+'<span class="tx">'+(tl?'<b style="font-family:var(--mono);font-weight:600">'+esc(tl)+'</b> ':'')+esc(t.title)+(t.repeat?' <span class="scope">'+REPEAT[t.repeat]+'</span>':'')+'</span></div>'; });
@@ -1275,14 +1315,15 @@
   /* ===== 날짜 상세 팝업 (모든 캘린더 공용) ===== */
   function tabFilter(){ return activeTab==="home"?null:activeTab; }
   function dayItems(key,filter,tKey){ var s=daySlot(key,tKey); var showExam=(filter===null||filter==="school"), showStudy=(filter===null||filter==="school");
-    return { exams:showExam?s.exams:[], study:showStudy?s.study:[], dues:s.dues.filter(function(d){return filter===null||((d.t.cat||"etc")===filter);}) }; }
-  function dayItemCount(it){ return it.exams.length+it.dues.length+it.study.length; }
+    return { exams:showExam?s.exams:[], study:showStudy?s.study:[], dues:s.dues.filter(function(d){return filter===null||((d.t.cat||"etc")===filter);}), master:(filter===null||filter==="school")?masterPlanOn(key):null }; }
+  function dayItemCount(it){ return it.exams.length+it.dues.length+it.study.length+(it.master?1:0); }
   function openDayModal(key){
     var tKey=todayKey(), filter=tabFilter(), it=dayItems(key,filter,tKey);
     if(dayItemCount(it)===0){ dayModalKey=null; return; }
     dayModalKey=key;
     var d=parseKey(key), nRel=diffDays(tKey,key), rel=nRel===0?"오늘":nRel===1?"내일":nRel===-1?"어제":ddayLabel(nRel);
     var rows="";
+    if(it.master){ rows+='<div class="dm-row"><span class="dot" style="background:var(--accent)"></span><div class="dm-main"><div class="dm-t">오늘의 학습 계획</div><div class="dm-sub"><span class="badge2 cn">주차별 계획</span></div><div class="dm-note">'+esc(it.master)+'</div></div></div>'; }
     it.exams.forEach(function(x){ var n=diffDays(tKey,x.exam);
       rows+='<div class="dm-row" data-action="edit-subject" data-id="'+x.id+'"><span class="dot" style="background:'+subjColor(x)+'"></span><div class="dm-main"><div class="dm-t">'+esc(x.name)+' 시험</div><div class="dm-sub"><span class="badge2 ex">시험</span><span class="dm">'+fmtDate(x.exam)+' · '+ddayLabel(n)+'</span></div></div><div class="dm-acts"><button data-action="edit-subject" data-id="'+x.id+'" aria-label="편집">'+PEN+'</button></div></div>'; });
     it.dues.forEach(function(d){ var t=d.t, c=CAT[t.cat]||CAT.etc, done=occDone(t,d.occ), st=shortStatus(d.start,d.end,done,tKey), dt=(d.start!==d.end)?(fmtDate(d.start)+" ~ "+fmtDate(d.end)):fmtDate(d.end), examB=(t.type==="exam")?EXAMCHIP:'', tl=timeLabel(t), repB=t.repeat?'<span class="cat-chip" style="background:var(--surface-2);color:var(--muted)"><span class="cdot" style="background:var(--muted)"></span>'+REPEAT[t.repeat]+'</span>':'';
