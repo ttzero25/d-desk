@@ -359,6 +359,12 @@
   .mp-row.done .mp-md{color:var(--muted);}
   .mp-hol .mp-md,.mp-hol .mp-wd{color:var(--sun)!important;}
   .mp-holname{margin-left:5px;font-size:10.5px;font-weight:600;color:var(--sun);}
+  .mp-prog{display:flex;align-items:center;gap:10px;margin:2px 0 6px;}
+  .mp-prog-bar{flex:1;height:8px;border-radius:999px;background:var(--surface-2);overflow:hidden;border:1px solid var(--line);}
+  .mp-prog-bar>i{display:block;height:100%;background:var(--accent);border-radius:999px;transition:width .25s;width:0;}
+  .mp-prog-txt{font-family:var(--mono);font-size:11.5px;color:var(--muted);white-space:nowrap;}
+  .mp-row.mp-today{background:var(--accent-soft);}
+  .mp-row.mp-today .mp-md{color:var(--accent-ink);font-weight:700;}
   @media (max-width:480px){ .mp-row{grid-template-columns:20px 60px 1fr;gap:8px;padding:9px 11px;} }
   @media (max-width:860px){ .stats{grid-template-columns:repeat(2,1fr);} .home-grid{grid-template-columns:1fr;} }
   @media (max-width:480px){ .wrap{padding:14px 12px 90px;} .nav button{padding:8px 11px;font-size:12.5px;} .cal-cell{min-height:46px;} .day{grid-template-columns:60px 1fr;} .pomo{right:12px;left:12px;width:auto;} }
@@ -381,6 +387,9 @@
         </button>
         <button class="btn icon ghost" id="ttBtn" title="설정 (시간표·학습 시작일)" aria-label="설정">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 10h18M9 4v18M15 4v18"/></svg>
+        </button>
+        <button class="btn icon ghost" id="backupBtn" title="데이터 백업 / 복원" aria-label="데이터 백업 / 복원">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
         </button>
         <button class="btn" data-action="add-task"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>일정</button>
         <button class="btn primary" data-action="add-subject"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>과목</button>
@@ -957,10 +966,32 @@
     "2026-10-22":"OS 시험 / 시험 후 생명정보과학 1~7주차 취약 부분 정리"
   };
   function masterPlanOn(key){ return MASTER_PLAN[key]||null; }
+  // 계획표 기준 실제 시험일 — '다음/남은 시험' 계산에 사용(등록 과목·시험 일정과 합산)
+  var EXAM_DATES=[
+    {name:"AI보안", date:"2026-10-13"},
+    {name:"데이터통신과네트워크", date:"2026-10-21"},
+    {name:"운영체제", date:"2026-10-22"}
+  ];
+  function allExams(){
+    var m={};
+    EXAM_DATES.forEach(function(e){ m[e.date+"|"+e.name]={name:e.name,date:e.date}; });
+    var subs=subjects(); Object.keys(subs).forEach(function(id){ var s=subs[id]; if(s.exam) m[s.exam+"|"+s.name]={name:s.name,date:s.exam}; });
+    var tk=tasks(); Object.keys(tk).forEach(function(id){ var t=tk[id]; if(t.type==="exam"){ var dt=t.due||t.start; if(dt) m[dt+"|"+t.title]={name:t.title,date:dt}; } });
+    return Object.keys(m).map(function(k){return m[k];}).sort(function(a,b){return a.date<b.date?-1:a.date>b.date?1:0;});
+  }
+  function upcomingExams(tKey){ return allExams().filter(function(e){ return diffDays(tKey,e.date)>=0; }); }
   // 주차별 계획표 정적 패널: 날짜별 완료 체크박스(로컬 저장) + 공휴일 빨간색 표시
   var MP_DONE_KEY="dd_mplan_done";
   function loadMpDone(){ try{ return JSON.parse(localStorage.getItem(MP_DONE_KEY)||"{}")||{}; }catch(e){ return {}; } }
   function saveMpDone(m){ try{ localStorage.setItem(MP_DONE_KEY,JSON.stringify(m)); }catch(e){} }
+  function updateMpProgress(){
+    var done=loadMpDone(), total=Object.keys(MASTER_PLAN).length, n=0;
+    Object.keys(MASTER_PLAN).forEach(function(k){ if(done[k]) n++; });
+    var pct=total?Math.round(n/total*100):0;
+    var fill=document.getElementById('mpProgFill'), txt=document.getElementById('mpProgTxt');
+    if(fill) fill.style.width=pct+'%';
+    if(txt) txt.textContent=n+' / '+total+' 완료 · '+pct+'%';
+  }
   function enhanceMasterPlan(){
     var panel=document.getElementById('mplanPanel');
     if(panel && !panel.__mpToggle){
@@ -975,11 +1006,18 @@
         head.addEventListener('keydown',function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); toggle(); } });
       }
     }
+    var mplan=document.querySelector('.mplan');
+    if(mplan && !mplan.querySelector('.mp-prog')){
+      var pg=document.createElement('div'); pg.className='mp-prog';
+      pg.innerHTML='<div class="mp-prog-bar"><i id="mpProgFill"></i></div><span class="mp-prog-txt" id="mpProgTxt"></span>';
+      mplan.insertBefore(pg, mplan.firstChild);
+    }
     var rows=document.querySelectorAll('.mp-row[data-date]');
     if(!rows.length) return;
-    var done=loadMpDone();
+    var done=loadMpDone(), tKey=todayKey();
     Array.prototype.forEach.call(rows,function(row){
       var key=row.getAttribute('data-date');
+      if(key===tKey) row.classList.add('mp-today');
       var hn=holidayName(key);
       if(hn && !row.classList.contains('mp-hol')){
         row.classList.add('mp-hol');
@@ -995,11 +1033,13 @@
           if(chk.checked){ d[key]=1; row.classList.add('done'); } else { delete d[key]; row.classList.remove('done'); }
           saveMpDone(d);
           renderStats(todayKey());
+          updateMpProgress();
         });
       }
       if(done[key]){ chk.checked=true; row.classList.add('done'); }
       else { chk.checked=false; row.classList.remove('done'); }
     });
+    updateMpProgress();
   }
 
   function daySlot(key, tKey){
@@ -1129,10 +1169,9 @@
   }
   function renderAllCalendars(){ var t=todayKey(); renderCalInto("home",null,t); renderCalInto("school","school",t); renderCalInto("commsec","commsec",t); renderCalInto("asc","asc",t); renderCalInto("etc","etc",t); }
   function renderNextExam(tKey){
-    var up=Object.keys(subjects()).map(function(id){return subjects()[id];}).filter(function(s){return diffDays(tKey,s.exam)>=0;}).sort(function(a,b){return a.exam<b.exam?-1:1;});
-    var n0=up[0];
+    var n0=upcomingExams(tKey)[0];
     $("nextExam").innerHTML=n0
-      ? '<div class="next-exam"><div class="lbl">다음 시험까지</div><div class="dd">'+ddayLabel(diffDays(tKey,n0.exam))+'</div><div class="nm">'+esc(n0.name)+'</div><div class="dt">'+fmtDate(n0.exam)+' ('+WD[parseKey(n0.exam).getDay()]+')</div></div>'
+      ? '<div class="next-exam"><div class="lbl">다음 시험까지</div><div class="dd">'+ddayLabel(diffDays(tKey,n0.date))+'</div><div class="nm">'+esc(n0.name)+'</div><div class="dt">'+fmtDate(n0.date)+' ('+WD[parseKey(n0.date).getDay()]+')</div></div>'
       : '<div class="next-exam none"><div class="lbl">다음 시험</div><div class="dd">예정 없음</div></div>';
   }
   function renderDayDetail(tKey){
@@ -1173,8 +1212,8 @@
   }
 
   function renderStats(tKey){
-    var subs=subjects(), tk=tasks();
-    var up=Object.keys(subs).map(function(id){return subs[id];}).filter(function(s){return diffDays(tKey,s.exam)>=0;}).sort(function(a,b){return a.exam<b.exam?-1:1;});
+    var tk=tasks();
+    var up=upcomingExams(tKey);
     var openT=Object.keys(tk).map(function(id){return tk[id];}).filter(function(t){return !t.done;});
     var soonT=openT.filter(function(t){return t.due&&diffDays(tKey,t.due)<=3;});
     // 주차별 계획표(정적) 기준으로 오늘 학습량 · 남은 할 일 계산
@@ -1183,8 +1222,8 @@
     var planDaysLeft=0; Object.keys(MASTER_PLAN).forEach(function(k){ if(k>=tKey && !mpDone[k]) planDaysLeft++; });
     var ne=up[0];
     $("stats").innerHTML=
-      stat("다음 시험", ne?ddayLabel(diffDays(tKey,ne.exam)):"—", ne?esc(ne.name):"예정 없음")+
-      stat("남은 시험", up.length, up.length?"마지막 "+ddayLabel(diffDays(tKey,up[up.length-1].exam)):"모두 완료")+
+      stat("다음 시험", ne?ddayLabel(diffDays(tKey,ne.date)):"—", ne?esc(ne.name):"예정 없음")+
+      stat("남은 시험", up.length, up.length?"마지막 "+ddayLabel(diffDays(tKey,up[up.length-1].date)):"모두 완료")+
       stat("오늘 학습량", todayCount?todayCount+"개":"0", tp?(todayDone?"오늘 완료 ✓":"오늘 목표 · 미완료"):"오늘은 계획 없음")+
       stat("남은 할 일", planDaysLeft+openT.length, soonT.length?soonT.length+"개 임박":(planDaysLeft?"계획 "+planDaysLeft+"일 남음":"임박 없음"));
   }
@@ -1512,9 +1551,51 @@
   try{ var sv=localStorage.getItem("exam_theme"); if(sv) document.documentElement.setAttribute("data-theme",sv); }catch(e){}
   themeBtn.addEventListener("click",function(){ var cur=document.documentElement.getAttribute("data-theme"); var dark=cur?cur==="dark":window.matchMedia("(prefers-color-scheme: dark)").matches; var next=dark?"light":"dark"; document.documentElement.setAttribute("data-theme",next); try{localStorage.setItem("exam_theme",next);}catch(e){} });
 
+  /* ===== 데이터 백업 / 복원 ===== */
+  var BACKUP_KEYS=["ddesk_v2","dd_mplan_done","dd_mplan_collapsed","dd_timetable","dd_study_start","dd_tab","exam_theme","dd_notify"];
+  function exportData(){
+    var out={_app:"d-desk",_ver:1,_exportedAt:new Date().toISOString(),data:{}};
+    BACKUP_KEYS.forEach(function(k){ try{ var v=localStorage.getItem(k); if(v!=null) out.data[k]=v; }catch(e){} });
+    var blob=new Blob([JSON.stringify(out,null,2)],{type:"application/json"});
+    var url=URL.createObjectURL(blob), a=document.createElement("a");
+    a.href=url; a.download="d-desk-backup-"+todayKey()+".json"; document.body.appendChild(a); a.click();
+    setTimeout(function(){ document.body.removeChild(a); URL.revokeObjectURL(url); },100);
+  }
+  function importData(file){
+    var r=new FileReader();
+    r.onload=function(){
+      try{
+        var o=JSON.parse(r.result), d=(o&&o.data)?o.data:o;
+        if(!d||typeof d!=="object") throw 0;
+        var n=0; Object.keys(d).forEach(function(k){ if(BACKUP_KEYS.indexOf(k)>=0 && typeof d[k]==="string"){ try{ localStorage.setItem(k,d[k]); n++; }catch(e){} } });
+        if(!n) throw 0;
+        alert("복원 완료 — 페이지를 새로고침합니다.");
+        location.reload();
+      }catch(e){ alert("가져오기 실패: 올바른 D-Desk 백업 파일이 아닙니다."); }
+    };
+    r.readAsText(file);
+  }
+  function openBackupModal(){
+    dayModalKey=null;
+    modal.innerHTML='<div class="modal-head"><h3>데이터 백업 / 복원</h3><button class="btn icon ghost" data-close>'+X+'</button></div>'+
+      '<div class="modal-body">'+
+        '<p style="font-size:12.5px;color:var(--muted);line-height:1.5;margin:0 0 14px">모든 데이터는 이 브라우저에만 저장돼요. 캐시를 지우거나 다른 기기로 옮기기 전에 백업하세요.</p>'+
+        '<div style="display:flex;flex-direction:column;gap:10px">'+
+          '<button class="btn primary" id="bk-export" style="justify-content:center"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>백업 파일 내보내기 (.json)</button>'+
+          '<label class="btn" style="cursor:pointer;justify-content:center"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>백업 파일 가져오기<input type="file" id="bk-import" accept="application/json,.json" style="display:none"></label>'+
+          '<p style="font-size:11.5px;color:var(--muted);margin:2px 0 0">※ 가져오기는 현재 데이터를 덮어써요.</p>'+
+        '</div>'+
+      '</div>';
+    modal.querySelectorAll("[data-close]").forEach(function(b){ b.addEventListener("click",closeModal); });
+    $("bk-export").addEventListener("click",exportData);
+    $("bk-import").addEventListener("change",function(e){ if(e.target.files&&e.target.files[0]) importData(e.target.files[0]); });
+    scrim.classList.add("open");
+  }
+
   /* ===== 알림 버튼 ===== */
   (function(){ var b=$("notifBtn"); if(b) b.addEventListener("click",toggleNotif); paintNotifBtn(); setInterval(checkNotifications,60000); })();
   (function(){ var b=$("ttBtn"); if(b) b.addEventListener("click",openTimetableModal); })();
+  (function(){ var b=$("backupBtn"); if(b) b.addEventListener("click",openBackupModal); })();
 
   /* ===== 뽀모도로 ===== */
   var pomo={ focus:25, brk:5, mode:"focus", remain:25*60, running:false, timer:null, cycles:0 };
