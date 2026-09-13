@@ -743,22 +743,7 @@
   LocalStore.prototype.getTasks=function(){ return this.data.tasks; };
 
   var store=null, isDemo=false, _demo=null;
-  function demoData(){ var t=new Date(); function p(n){ return keyOf(new Date(t.getTime()+n*DAY)); }
-    return {
-      subjects:{
-        d1:{id:"d1",name:"자료구조",exam:p(5),workload:3,scope:"1장 배열,2장 연결리스트,3장 스택/큐,4장 트리,5장 그래프,6장 정렬",colorIdx:0,materials:[{label:"강의노트 PDF",url:"#"},{label:"기출문제",url:"#"}],done:{}},
-        d2:{id:"d2",name:"미시경제학",exam:p(9),workload:2,scope:"수요공급,소비자이론,생산자이론,시장구조",colorIdx:1,materials:[{label:"교재 요약",url:"#"}],done:{}}
-      },
-      tasks:{
-        a1:{id:"a1",title:"자료구조 과제 3 — 트리 구현",cat:"school",subjectId:"d1",due:p(1),note:"AVL 회전 포함, 손코딩 X · 제출은 LMS",done:false},
-        a2:{id:"a2",title:"경제학 리포트 제출",cat:"school",subjectId:"d2",due:p(4),done:false},
-        a3:{id:"a3",title:"논문 세미나 발표 준비",cat:"commsec",subjectId:"",due:p(2),done:false},
-        a4:{id:"a4",title:"주간 랩미팅",cat:"commsec",subjectId:"",start:p(1),due:p(1),startTime:"10:00",endTime:"11:30",repeat:"weekly",done:false,doneDates:{}},
-        a5:{id:"a5",title:"동아리 정기공연",cat:"asc",subjectId:"",start:p(3),due:p(5),done:false},
-        a6:{id:"a6",title:"장학금 서류 제출",cat:"etc",subjectId:"",due:p(0),done:false}
-      }
-    };
-  }
+  function demoData(){ return { subjects:{}, tasks:{} }; }
   function subjects(){ return isDemo?_demo.subjects:store.getSubjects(); }
   function tasks(){ return isDemo?_demo.tasks:store.getTasks(); }
   function subjColor(s){ return PALETTE[(s.colorIdx||0)%PALETTE.length]; }
